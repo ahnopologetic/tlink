@@ -35,11 +35,18 @@ pub fn run(uri: &str) -> Result<()> {
 
 fn execute_switch(target: &TmuxTarget) -> Result<()> {
     let Some(session) = &target.session else { return Ok(()) };
-    run_tmux(&["switch-client", "-t", session])?;
-    let Some(window) = &target.window else { return Ok(()) };
-    run_tmux(&["select-window", "-t", window])?;
-    let Some(pane) = &target.pane else { return Ok(()) };
-    run_tmux(&["select-pane", "-t", pane])
+
+    // Build a fully-qualified tmux target: session[:window[.pane]]
+    // A single switch-client call is correct — issuing separate select-window/select-pane
+    // calls in subprocesses races against tmux's "current session" context and lands on
+    // the wrong window.
+    let tmux_target = match (&target.window, &target.pane) {
+        (Some(w), Some(p)) => format!("{session}:{w}.{p}"),
+        (Some(w), None) => format!("{session}:{w}"),
+        _ => session.to_string(),
+    };
+
+    run_tmux(&["switch-client", "-t", &tmux_target])
 }
 
 fn run_tmux(args: &[&str]) -> Result<()> {
@@ -90,5 +97,33 @@ mod tests {
     fn test_parse_invalid_scheme_errors() {
         assert!(parse_uri("https://foo").is_err());
         assert!(parse_uri("tmux:foo").is_err());
+    }
+
+    #[test]
+    fn test_tmux_target_session_only() {
+        let t = TmuxTarget { session: Some("dorv".into()), window: None, pane: None };
+        // single switch-client to session
+        assert_eq!(
+            match (&t.window, &t.pane) {
+                (Some(w), Some(p)) => format!("{}:{}.{}", t.session.as_ref().unwrap(), w, p),
+                (Some(w), None) => format!("{}:{}", t.session.as_ref().unwrap(), w),
+                _ => t.session.unwrap(),
+            },
+            "dorv"
+        );
+    }
+
+    #[test]
+    fn test_tmux_target_session_window() {
+        let t = TmuxTarget { session: Some("dorv".into()), window: Some("work".into()), pane: None };
+        let target = format!("{}:{}", t.session.unwrap(), t.window.unwrap());
+        assert_eq!(target, "dorv:work");
+    }
+
+    #[test]
+    fn test_tmux_target_full() {
+        let t = TmuxTarget { session: Some("dorv".into()), window: Some("work".into()), pane: Some("1".into()) };
+        let target = format!("{}:{}.{}", t.session.unwrap(), t.window.unwrap(), t.pane.unwrap());
+        assert_eq!(target, "dorv:work.1");
     }
 }

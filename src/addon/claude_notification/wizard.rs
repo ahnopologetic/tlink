@@ -48,10 +48,16 @@ pub struct EventOpt {
 impl EventOpt {
     fn all_events() -> Vec<Self> {
         vec![
-            Self { event: HookEvent::IdlePrompt,       selected: true  },
-            Self { event: HookEvent::PermissionPrompt, selected: false },
-            Self { event: HookEvent::AuthSuccess,      selected: false },
-            Self { event: HookEvent::All,              selected: false },
+            // Pre-checked: the two events users almost always want
+            Self { event: HookEvent::IdlePrompt,          selected: true  },
+            Self { event: HookEvent::PermissionPrompt,    selected: true  },
+            // Opt-in: lower signal or MCP-specific
+            Self { event: HookEvent::AuthSuccess,         selected: false },
+            Self { event: HookEvent::ElicitationDialog,   selected: false },
+            Self { event: HookEvent::ElicitationComplete, selected: false },
+            Self { event: HookEvent::ElicitationResponse, selected: false },
+            // Catch-all: overrides individual selections
+            Self { event: HookEvent::All,                 selected: false },
         ]
     }
 }
@@ -382,6 +388,11 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                 lines.push(Line::from(""));
             }
             lines.push(Line::from(Span::styled(
+                "  Note: this runs alongside Claude Code's built-in preferredNotifChannel setting",
+                Style::default().fg(Color::DarkGray),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
                 "Press Enter to exit",
                 Style::default().fg(Color::DarkGray),
             )));
@@ -471,6 +482,14 @@ mod tests {
     }
 
     #[test]
+    fn test_select_events_defaults_idle_and_permission_prechecked() {
+        let events = EventOpt::all_events();
+        assert!(events.iter().find(|e| e.event == HookEvent::IdlePrompt).unwrap().selected);
+        assert!(events.iter().find(|e| e.event == HookEvent::PermissionPrompt).unwrap().selected);
+        assert!(!events.iter().find(|e| e.event == HookEvent::All).unwrap().selected);
+    }
+
+    #[test]
     fn test_select_events_enter_defaults_to_idle_when_none_selected() {
         let state = State::SelectEvents {
             events: EventOpt::all_events()
@@ -484,6 +503,18 @@ mod tests {
         } else {
             panic!("expected Confirm");
         }
+    }
+
+    #[test]
+    fn test_all_six_notification_types_present() {
+        let events = EventOpt::all_events();
+        let types: Vec<&HookEvent> = events.iter().map(|e| &e.event).collect();
+        assert!(types.contains(&&HookEvent::IdlePrompt));
+        assert!(types.contains(&&HookEvent::PermissionPrompt));
+        assert!(types.contains(&&HookEvent::AuthSuccess));
+        assert!(types.contains(&&HookEvent::ElicitationDialog));
+        assert!(types.contains(&&HookEvent::ElicitationComplete));
+        assert!(types.contains(&&HookEvent::ElicitationResponse));
     }
 
     #[test]

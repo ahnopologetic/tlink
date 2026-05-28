@@ -55,39 +55,58 @@ impl NotifMethod {
     }
 }
 
+/// All notification_type values Claude Code can emit (as of current docs).
+/// Matcher is pipe-separated exact values; empty string matches all.
 #[derive(Clone, PartialEq, Debug)]
 pub enum HookEvent {
-    IdlePrompt,
-    PermissionPrompt,
-    AuthSuccess,
+    // ── High-signal (default on) ───────────────────────────────────────────
+    IdlePrompt,        // Claude finished and is waiting — most useful
+    PermissionPrompt,  // Claude needs your approval to proceed
+    // ── Lower-signal (opt-in) ─────────────────────────────────────────────
+    AuthSuccess,             // Authentication token refreshed
+    ElicitationDialog,       // MCP server is asking you a question via Claude
+    ElicitationComplete,     // MCP dialog interaction finished
+    ElicitationResponse,     // Your response was submitted to the MCP server
+    // ── Catch-all ─────────────────────────────────────────────────────────
     All,
 }
 
 impl HookEvent {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::IdlePrompt       => "idle_prompt",
-            Self::PermissionPrompt => "permission_prompt",
-            Self::AuthSuccess      => "auth_success",
-            Self::All              => "all events",
+            Self::IdlePrompt          => "idle_prompt",
+            Self::PermissionPrompt    => "permission_prompt",
+            Self::AuthSuccess         => "auth_success",
+            Self::ElicitationDialog   => "elicitation_dialog",
+            Self::ElicitationComplete => "elicitation_complete",
+            Self::ElicitationResponse => "elicitation_response",
+            Self::All                 => "all events",
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::IdlePrompt       => "Claude finished a task and is waiting for your input",
-            Self::PermissionPrompt => "Claude is requesting permission to run a command",
-            Self::AuthSuccess      => "Claude authentication completed",
-            Self::All              => "Every notification Claude emits",
+            Self::IdlePrompt          => "Claude finished a task and is waiting for your input",
+            Self::PermissionPrompt    => "Claude needs your approval before running a tool",
+            Self::AuthSuccess         => "Authentication token was refreshed",
+            Self::ElicitationDialog   => "An MCP server is asking you a question via Claude",
+            Self::ElicitationComplete => "An MCP elicitation dialog finished",
+            Self::ElicitationResponse => "Your response was submitted to an MCP server",
+            Self::All                 => "Every notification Claude emits (all 6 types)",
         }
     }
 
+    /// Returns the matcher string for settings.json. Pipe-separated for multi-event.
+    /// Empty string matches all notification types.
     pub fn matcher(&self) -> &'static str {
         match self {
-            Self::IdlePrompt       => "idle_prompt",
-            Self::PermissionPrompt => "permission_prompt",
-            Self::AuthSuccess      => "auth_success",
-            Self::All              => "",
+            Self::IdlePrompt          => "idle_prompt",
+            Self::PermissionPrompt    => "permission_prompt",
+            Self::AuthSuccess         => "auth_success",
+            Self::ElicitationDialog   => "elicitation_dialog",
+            Self::ElicitationComplete => "elicitation_complete",
+            Self::ElicitationResponse => "elicitation_response",
+            Self::All                 => "",
         }
     }
 }

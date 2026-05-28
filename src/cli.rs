@@ -22,4 +22,26 @@ pub enum Commands {
     Restart,
     /// Run diagnostic checks and report pass/fail
     Doctor,
+    /// Install a tlink add-on
+    Install {
+        /// Add-on name (e.g. claude-notification)
+        addon: String,
+    },
+    /// Remove a tlink add-on
+    Delete {
+        /// Add-on name (e.g. claude-notification)
+        addon: String,
+    },
+    /// List available add-ons
+    List {
+        #[command(subcommand)]
+        target: ListTarget,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ListTarget {
+    /// Show all add-ons and their status
+    #[command(name = "add-ons")]
+    Addons,
 }

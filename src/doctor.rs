@@ -64,7 +64,7 @@ pub fn scheme_in_lsregister() -> bool {
     Command::new(LSREGISTER)
         .args(["-dump"])
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).contains("tmux"))
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("tmux://"))
         .unwrap_or(false)
 }
 

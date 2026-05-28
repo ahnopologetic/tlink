@@ -94,13 +94,6 @@ fn execute_switch(target: &TmuxTarget, adapter: Option<&crate::terminal::Termina
     Ok(())
 }
 
-fn run_tmux(args: &[&str]) -> Result<()> {
-    let status = Command::new("tmux").args(args).status()?;
-    if !status.success() {
-        bail!("tmux {} exited with {}", args[0], status);
-    }
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {

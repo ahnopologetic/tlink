@@ -57,6 +57,7 @@ impl NotifMethod {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_config_key(key: &str) -> Option<Self> {
         match key {
             "terminal-notifier" => Some(Self::TerminalNotifier),
@@ -243,7 +244,7 @@ exec tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE"
 "##
 }
 
-#[deprecated(note = "use hook_script() — method is now stored in config and handled by tlink notify")]
+#[allow(dead_code)]
 pub fn generate_hook_script(method: &NotifMethod) -> String {
     // DEEPLINK is only passed to the click action (-execute / tlink open),
     // never shown as visible notification text.

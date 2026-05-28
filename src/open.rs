@@ -23,30 +23,51 @@ pub fn parse_uri(uri: &str) -> Result<TmuxTarget> {
 
 pub fn run(uri: &str) -> Result<()> {
     let target = parse_uri(uri)?;
-    execute_switch(&target)?;
 
-    if let Ok(config) = crate::config::load() {
-        if let Some(name) = config.terminal {
-            let _ = crate::terminal::from_name(&name).focus();
-        }
+    // Load terminal adapter once — used for both focus and attach fallback.
+    let adapter = crate::config::load()
+        .ok()
+        .and_then(|c| c.terminal)
+        .map(|name| crate::terminal::from_name(&name));
+
+    // Focus terminal FIRST so it is in front when tmux switch-client fires.
+    // Without this, switch-client succeeds but the terminal stays hidden.
+    if let Some(ref a) = adapter {
+        let _ = a.focus();
+        // Give the window manager time to actually bring the window to front.
+        std::thread::sleep(std::time::Duration::from_millis(150));
     }
+
+    execute_switch(&target, adapter.as_ref())?;
     Ok(())
 }
 
-fn execute_switch(target: &TmuxTarget) -> Result<()> {
+fn execute_switch(target: &TmuxTarget, adapter: Option<&crate::terminal::TerminalAdapter>) -> Result<()> {
     let Some(session) = &target.session else { return Ok(()) };
 
-    // Build a fully-qualified tmux target: session[:window[.pane]]
-    // A single switch-client call is correct — issuing separate select-window/select-pane
-    // calls in subprocesses races against tmux's "current session" context and lands on
-    // the wrong window.
     let tmux_target = match (&target.window, &target.pane) {
         (Some(w), Some(p)) => format!("{session}:{w}.{p}"),
-        (Some(w), None) => format!("{session}:{w}"),
-        _ => session.to_string(),
+        (Some(w), None)    => format!("{session}:{w}"),
+        _                  => session.to_string(),
     };
 
-    run_tmux(&["switch-client", "-t", &tmux_target])?;
+    // switch-client works when any tmux client is attached (even if the terminal
+    // was backgrounded). If it fails the session is truly detached — fall back to
+    // asking the terminal to run attach-session in a new window.
+    let switched = Command::new("tmux")
+        .args(["switch-client", "-t", &tmux_target])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if !switched {
+        if let Some(a) = adapter {
+            let _ = a.attach_tmux(&tmux_target);
+        } else {
+            bail!("tmux switch-client failed and no terminal adapter configured");
+        }
+        return Ok(()); // toast/flash require an attached client; skip for now
+    }
 
     // Status-bar toast.
     let label = match (&target.window, &target.pane) {

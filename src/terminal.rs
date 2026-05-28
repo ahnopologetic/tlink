@@ -20,6 +20,43 @@ impl TerminalAdapter {
             other => open_app(other),
         }
     }
+
+    /// Tell the terminal to open a new window/tab running `tmux attach-session -t target`.
+    /// Used when no tmux client is attached (truly detached), so switch-client won't work.
+    pub fn attach_tmux(&self, target: &str) -> Result<()> {
+        match self.name.as_str() {
+            "iTerm2" => {
+                let script = format!(
+                    r#"tell application "iTerm2" to create window with default profile command "tmux attach-session -t {}""#,
+                    target
+                );
+                Command::new("osascript").args(["-e", &script]).status()?;
+            }
+            "Terminal" | "Terminal.app" => {
+                let script = format!(
+                    r#"tell application "Terminal" to do script "tmux attach-session -t {}""#,
+                    target
+                );
+                Command::new("osascript").args(["-e", &script]).status()?;
+            }
+            "WezTerm" => {
+                // wezterm CLI can spawn a command in a new tab
+                Command::new("wezterm")
+                    .args(["cli", "spawn", "--", "tmux", "attach-session", "-t", target])
+                    .status()?;
+            }
+            "Kitty" => {
+                Command::new("kitty")
+                    .args(["@", "launch", "--type=tab", "--", "tmux", "attach-session", "-t", target])
+                    .status()?;
+            }
+            _ => {
+                // Ghostty and others: focus only — no public API for sending commands
+                self.focus()?;
+            }
+        }
+        Ok(())
+    }
 }
 
 fn applescript_activate(app_name: &str) -> Result<()> {

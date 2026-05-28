@@ -2,6 +2,10 @@
 name = "tlink"
 version = "0.1.0"
 edition = "2021"
+description = "tmux:// deeplink CLI for macOS"
+repository = "https://github.com/ahnopologetic/tlink"
+license = "MIT"
+keywords = ["tmux", "deeplink", "cli", "macos"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

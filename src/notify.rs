@@ -31,13 +31,33 @@ fn applescript_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+/// macOS bundle ID for known terminals — used to attribute notifications correctly.
+fn bundle_id(terminal: &str) -> &'static str {
+    match terminal {
+        "Ghostty"                   => "com.mitchellh.ghostty",
+        "iTerm2"                    => "com.googlecode.iterm2",
+        "Terminal" | "Terminal.app" => "com.apple.Terminal",
+        "Kitty"                     => "net.kovidgoyal.kitty",
+        "WezTerm"                   => "com.github.wez.wezterm",
+        _                           => "com.apple.Terminal",
+    }
+}
+
+fn terminal_notifier_available() -> bool {
+    Command::new("which")
+        .arg("terminal-notifier")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 pub fn run(session: &str, window: &str, pane: &str) -> Result<()> {
     let mut stdin = String::new();
     std::io::stdin().read_to_string(&mut stdin)?;
 
     let payload: Payload = serde_json::from_str(&stdin).unwrap_or_default();
-    let message  = payload.message.as_deref().unwrap_or("Claude notification");
-    let title    = payload.notification_type
+    let message = payload.message.as_deref().unwrap_or("Claude notification");
+    let title   = payload.notification_type
         .as_deref()
         .map(type_to_title)
         .unwrap_or("Claude Code");
@@ -45,28 +65,20 @@ pub fn run(session: &str, window: &str, pane: &str) -> Result<()> {
     let deeplink = format!("tmux://{}/{}/{}", session, window, pane);
     let location = format!("{} > {} > {}", session, window, pane);
 
-    let config = crate::config::load().unwrap_or_default();
-    let method = config.notification_method.as_deref().unwrap_or("osascript");
+    let config   = crate::config::load().unwrap_or_default();
+    let method   = config.notification_method.as_deref().unwrap_or("osascript");
+    let terminal = config.terminal.as_deref().unwrap_or("Ghostty");
 
-    fire(method, title, message, &location, &deeplink)
+    fire(method, terminal, title, message, &location, &deeplink)
 }
 
-fn fire(method: &str, title: &str, message: &str, location: &str, deeplink: &str) -> Result<()> {
+fn fire(method: &str, terminal: &str, title: &str, message: &str, location: &str, deeplink: &str) -> Result<()> {
     match method {
         "terminal-notifier" => {
-            Command::new("terminal-notifier")
-                .args([
-                    "-title",    title,
-                    "-subtitle", location,
-                    "-message",  message,
-                    "-execute",  &format!("tlink open {}", deeplink),
-                ])
-                .spawn()?;
+            fire_terminal_notifier(bundle_id(terminal), title, message, location, deeplink)?;
         }
 
         "dunstify" => {
-            // dunstify blocks until dismissed; run in background shell and
-            // follow up with tlink open if the user clicked "Go there".
             let cmd = format!(
                 "ACTION=$(dunstify {t} {m} --action='default,Go there' \
                     --urgency=normal --icon=utilities-terminal --appname='Claude Code'); \
@@ -90,17 +102,37 @@ fn fire(method: &str, title: &str, message: &str, location: &str, deeplink: &str
                 .status()?;
         }
 
-        // "osascript" or any unknown value
+        // "osascript" or any unknown value:
+        // Prefer terminal-notifier if available — osascript's display notification
+        // is owned by Script Editor, so clicking the notification opens Script Editor
+        // instead of the user's terminal.
         _ => {
-            let script = format!(
-                "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"",
-                applescript_escape(message),
-                applescript_escape(title),
-                applescript_escape(location),
-            );
-            Command::new("osascript").args(["-e", &script]).status()?;
+            if terminal_notifier_available() {
+                fire_terminal_notifier(bundle_id(terminal), title, message, location, deeplink)?;
+            } else {
+                let script = format!(
+                    "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"",
+                    applescript_escape(message),
+                    applescript_escape(title),
+                    applescript_escape(location),
+                );
+                Command::new("osascript").args(["-e", &script]).status()?;
+            }
         }
     }
+    Ok(())
+}
+
+fn fire_terminal_notifier(sender: &str, title: &str, message: &str, location: &str, deeplink: &str) -> Result<()> {
+    Command::new("terminal-notifier")
+        .args([
+            "-title",    title,
+            "-subtitle", location,
+            "-message",  message,
+            "-sender",   sender,
+            "-execute",  &format!("tlink open {}", deeplink),
+        ])
+        .spawn()?;
     Ok(())
 }
 

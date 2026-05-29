@@ -445,7 +445,7 @@ SESSION=$(tmux display-message -p "#{session_name}" 2>/dev/null) || exit 0
 WINDOW=$(tmux display-message -p "#{window_name}" 2>/dev/null) || exit 0
 PANE=$(tmux display-message -p "#{pane_index}" 2>/dev/null) || exit 0
 [ -z "$SESSION" ] && exit 0
-exec tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE"
+tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE" &
 "##
 }
 

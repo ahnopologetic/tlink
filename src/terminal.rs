@@ -6,7 +6,9 @@ pub struct TerminalAdapter {
 }
 
 pub fn from_name(name: &str) -> TerminalAdapter {
-    TerminalAdapter { name: name.to_string() }
+    TerminalAdapter {
+        name: name.to_string(),
+    }
 }
 
 impl TerminalAdapter {
@@ -47,7 +49,16 @@ impl TerminalAdapter {
             }
             "Kitty" => {
                 Command::new("kitty")
-                    .args(["@", "launch", "--type=tab", "--", "tmux", "attach-session", "-t", target])
+                    .args([
+                        "@",
+                        "launch",
+                        "--type=tab",
+                        "--",
+                        "tmux",
+                        "attach-session",
+                        "-t",
+                        target,
+                    ])
                     .status()?;
             }
             _ => {
@@ -64,7 +75,6 @@ fn applescript_activate(app_name: &str) -> Result<()> {
     Command::new("osascript").args(["-e", &script]).status()?;
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

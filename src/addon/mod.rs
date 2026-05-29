@@ -32,7 +32,7 @@ pub fn delete(name: &str) -> Result<()> {
 
 pub fn list() -> Result<()> {
     let addons = registry();
-    println!("{:<25} {:<15} {}", "NAME", "STATUS", "DESCRIPTION");
+    println!("{:<25} {:<15} DESCRIPTION", "NAME", "STATUS");
     println!("{}", "─".repeat(80));
     for a in &addons {
         let status = if a.installed {

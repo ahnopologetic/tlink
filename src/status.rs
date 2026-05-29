@@ -14,11 +14,12 @@ pub struct StatusInfo {
 pub fn collect() -> StatusInfo {
     let bundle_exists = crate::bundle::bundle_path().exists();
 
-    let scheme_registered = bundle_exists && Command::new(LSREGISTER)
-        .args(["-dump"])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).contains("tmux"))
-        .unwrap_or(false);
+    let scheme_registered = bundle_exists
+        && Command::new(LSREGISTER)
+            .args(["-dump"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains("tmux"))
+            .unwrap_or(false);
 
     let configured_terminal = crate::config::load().ok().and_then(|c| c.terminal);
 
@@ -34,15 +35,45 @@ pub fn collect() -> StatusInfo {
         _ => (false, vec![]),
     };
 
-    StatusInfo { bundle_exists, scheme_registered, configured_terminal, tmux_running, sessions }
+    StatusInfo {
+        bundle_exists,
+        scheme_registered,
+        configured_terminal,
+        tmux_running,
+        sessions,
+    }
 }
 
 pub fn run() -> Result<()> {
     let s = collect();
-    println!("URI scheme (tmux://): {}", if s.scheme_registered { "registered" } else { "not registered" });
-    println!("TmuxLink.app:         {}", if s.bundle_exists { "present" } else { "missing" });
-    println!("Terminal:             {}", s.configured_terminal.as_deref().unwrap_or("not configured"));
-    println!("tmux server:          {}", if s.tmux_running { "running" } else { "not running" });
+    println!(
+        "URI scheme (tmux://): {}",
+        if s.scheme_registered {
+            "registered"
+        } else {
+            "not registered"
+        }
+    );
+    println!(
+        "TmuxLink.app:         {}",
+        if s.bundle_exists {
+            "present"
+        } else {
+            "missing"
+        }
+    );
+    println!(
+        "Terminal:             {}",
+        s.configured_terminal.as_deref().unwrap_or("not configured")
+    );
+    println!(
+        "tmux server:          {}",
+        if s.tmux_running {
+            "running"
+        } else {
+            "not running"
+        }
+    );
     if s.tmux_running {
         if s.sessions.is_empty() {
             println!("Sessions:             (none)");

@@ -1,14 +1,14 @@
+mod addon;
+mod bundle;
 mod cli;
 mod config;
+mod doctor;
+mod notify;
 mod open;
-mod bundle;
-mod terminal;
-mod status;
 mod restart;
 mod setup;
-mod doctor;
-mod addon;
-mod notify;
+mod status;
+mod terminal;
 
 use anyhow::Result;
 use clap::Parser;
@@ -31,7 +31,13 @@ fn run() -> Result<()> {
         Commands::Doctor => doctor::run(),
         Commands::Install { addon } => addon::install(&addon),
         Commands::Delete { addon } => addon::delete(&addon),
-        Commands::List { target: ListTarget::Addons } => addon::list(),
-        Commands::Notify { session, window, pane } => notify::run(&session, &window, &pane),
+        Commands::List {
+            target: ListTarget::Addons,
+        } => addon::list(),
+        Commands::Notify {
+            session,
+            window,
+            pane,
+        } => notify::run(&session, &window, &pane),
     }
 }

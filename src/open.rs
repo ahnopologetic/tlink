@@ -15,10 +15,17 @@ pub fn parse_uri(uri: &str) -> Result<TmuxTarget> {
 
     let parts: Vec<&str> = stripped.splitn(3, '/').collect();
     let seg = |i: usize| -> Option<String> {
-        parts.get(i).filter(|s| !s.is_empty()).map(|s| s.to_string())
+        parts
+            .get(i)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
     };
 
-    Ok(TmuxTarget { session: seg(0), window: seg(1), pane: seg(2) })
+    Ok(TmuxTarget {
+        session: seg(0),
+        window: seg(1),
+        pane: seg(2),
+    })
 }
 
 pub fn run(uri: &str) -> Result<()> {
@@ -42,13 +49,18 @@ pub fn run(uri: &str) -> Result<()> {
     Ok(())
 }
 
-fn execute_switch(target: &TmuxTarget, adapter: Option<&crate::terminal::TerminalAdapter>) -> Result<()> {
-    let Some(session) = &target.session else { return Ok(()) };
+fn execute_switch(
+    target: &TmuxTarget,
+    adapter: Option<&crate::terminal::TerminalAdapter>,
+) -> Result<()> {
+    let Some(session) = &target.session else {
+        return Ok(());
+    };
 
     let tmux_target = match (&target.window, &target.pane) {
         (Some(w), Some(p)) => format!("{session}:{w}.{p}"),
-        (Some(w), None)    => format!("{session}:{w}"),
-        _                  => session.to_string(),
+        (Some(w), None) => format!("{session}:{w}"),
+        _ => session.to_string(),
     };
 
     // switch-client works when any tmux client is attached (even if the terminal
@@ -72,8 +84,8 @@ fn execute_switch(target: &TmuxTarget, adapter: Option<&crate::terminal::Termina
     // Status-bar toast.
     let label = match (&target.window, &target.pane) {
         (Some(w), Some(p)) => format!("tlink → {session}:{w}.{p}"),
-        (Some(w), None)    => format!("tlink → {session}:{w}"),
-        _                  => format!("tlink → {session}"),
+        (Some(w), None) => format!("tlink → {session}:{w}"),
+        _ => format!("tlink → {session}"),
     };
     let _ = Command::new("tmux")
         .args(["display-message", "-d", "2000", "-t", &tmux_target, &label])
@@ -83,17 +95,25 @@ fn execute_switch(target: &TmuxTarget, adapter: Option<&crate::terminal::Termina
     // pane-active-border-style is a window option, so target at window level.
     let win_target = match &target.window {
         Some(w) => format!("{session}:{w}"),
-        None    => session.to_string(),
+        None => session.to_string(),
     };
     let _ = Command::new("tmux")
-        .args(["set-option", "-t", &win_target, "pane-active-border-style", "fg=colour46,bold"])
+        .args([
+            "set-option",
+            "-t",
+            &win_target,
+            "pane-active-border-style",
+            "fg=colour46,bold",
+        ])
         .status();
-    let reset = format!("sleep 1.5 && tmux set-option -ut '{}' pane-active-border-style", win_target);
+    let reset = format!(
+        "sleep 1.5 && tmux set-option -ut '{}' pane-active-border-style",
+        win_target
+    );
     let _ = Command::new("sh").args(["-c", &reset]).spawn();
 
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -139,7 +159,11 @@ mod tests {
 
     #[test]
     fn test_tmux_target_session_only() {
-        let t = TmuxTarget { session: Some("dorv".into()), window: None, pane: None };
+        let t = TmuxTarget {
+            session: Some("dorv".into()),
+            window: None,
+            pane: None,
+        };
         // single switch-client to session
         assert_eq!(
             match (&t.window, &t.pane) {
@@ -153,15 +177,28 @@ mod tests {
 
     #[test]
     fn test_tmux_target_session_window() {
-        let t = TmuxTarget { session: Some("dorv".into()), window: Some("work".into()), pane: None };
+        let t = TmuxTarget {
+            session: Some("dorv".into()),
+            window: Some("work".into()),
+            pane: None,
+        };
         let target = format!("{}:{}", t.session.unwrap(), t.window.unwrap());
         assert_eq!(target, "dorv:work");
     }
 
     #[test]
     fn test_tmux_target_full() {
-        let t = TmuxTarget { session: Some("dorv".into()), window: Some("work".into()), pane: Some("1".into()) };
-        let target = format!("{}:{}.{}", t.session.unwrap(), t.window.unwrap(), t.pane.unwrap());
+        let t = TmuxTarget {
+            session: Some("dorv".into()),
+            window: Some("work".into()),
+            pane: Some("1".into()),
+        };
+        let target = format!(
+            "{}:{}.{}",
+            t.session.unwrap(),
+            t.window.unwrap(),
+            t.pane.unwrap()
+        );
         assert_eq!(target, "dorv:work.1");
     }
 }

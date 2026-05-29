@@ -11,14 +11,26 @@ struct Check {
 
 pub fn run() -> Result<()> {
     let checks = vec![
-        Check { name: "tmux binary in PATH", pass: tmux_in_path(), advisory: false },
-        Check { name: "tmux server running", pass: tmux_server_running(), advisory: false },
+        Check {
+            name: "tmux binary in PATH",
+            pass: tmux_in_path(),
+            advisory: false,
+        },
+        Check {
+            name: "tmux server running",
+            pass: tmux_server_running(),
+            advisory: false,
+        },
         Check {
             name: "~/Applications/TmuxLink.app exists",
             pass: crate::bundle::bundle_path().exists(),
             advisory: false,
         },
-        Check { name: "tmux:// scheme in lsregister", pass: scheme_in_lsregister(), advisory: false },
+        Check {
+            name: "tmux:// scheme in lsregister",
+            pass: scheme_in_lsregister(),
+            advisory: false,
+        },
         Check {
             name: "configured terminal app exists in /Applications",
             pass: configured_terminal_exists(),
@@ -34,7 +46,11 @@ pub fn run() -> Result<()> {
     let mut any_failed = false;
     for check in &checks {
         let icon = if check.pass { "✓" } else { "✗" };
-        let advisory = if !check.pass && check.advisory { " (advisory)" } else { "" };
+        let advisory = if !check.pass && check.advisory {
+            " (advisory)"
+        } else {
+            ""
+        };
         println!("{icon} {}{advisory}", check.name);
         if !check.pass && !check.advisory {
             any_failed = true;
@@ -49,7 +65,11 @@ pub fn run() -> Result<()> {
 }
 
 pub fn tmux_in_path() -> bool {
-    Command::new("which").arg("tmux").status().map(|s| s.success()).unwrap_or(false)
+    Command::new("which")
+        .arg("tmux")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 pub fn tmux_server_running() -> bool {

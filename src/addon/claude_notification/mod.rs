@@ -27,11 +27,11 @@ fn macos_major_version() -> u32 {
 impl NotifMethod {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Alerter          => "alerter",
+            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
-            Self::Osascript        => "osascript (built-in)",
-            Self::Dunstify         => "dunstify",
-            Self::NotifySend       => "notify-send",
+            Self::Osascript => "osascript (built-in)",
+            Self::Dunstify => "dunstify",
+            Self::NotifySend => "notify-send",
         }
     }
 
@@ -52,11 +52,11 @@ impl NotifMethod {
 
     pub fn available(&self) -> bool {
         let cmd = match self {
-            Self::Alerter          => "alerter",
+            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
-            Self::Osascript        => "osascript",
-            Self::Dunstify         => "dunstify",
-            Self::NotifySend       => "notify-send",
+            Self::Osascript => "osascript",
+            Self::Dunstify => "dunstify",
+            Self::NotifySend => "notify-send",
         };
         std::process::Command::new("which")
             .arg(cmd)
@@ -67,23 +67,23 @@ impl NotifMethod {
 
     pub fn config_key(&self) -> &'static str {
         match self {
-            Self::Alerter          => "alerter",
+            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
-            Self::Osascript        => "osascript",
-            Self::Dunstify         => "dunstify",
-            Self::NotifySend       => "notify-send",
+            Self::Osascript => "osascript",
+            Self::Dunstify => "dunstify",
+            Self::NotifySend => "notify-send",
         }
     }
 
     #[allow(dead_code)]
     pub fn from_config_key(key: &str) -> Option<Self> {
         match key {
-            "alerter"           => Some(Self::Alerter),
+            "alerter" => Some(Self::Alerter),
             "terminal-notifier" => Some(Self::TerminalNotifier),
-            "osascript"         => Some(Self::Osascript),
-            "dunstify"          => Some(Self::Dunstify),
-            "notify-send"       => Some(Self::NotifySend),
-            _                   => None,
+            "osascript" => Some(Self::Osascript),
+            "dunstify" => Some(Self::Dunstify),
+            "notify-send" => Some(Self::NotifySend),
+            _ => None,
         }
     }
 
@@ -104,7 +104,11 @@ impl NotifMethod {
     /// The single best method for this platform and OS version.
     pub fn recommended_method() -> Self {
         if cfg!(target_os = "macos") {
-            if macos_major_version() >= 12 { Self::Alerter } else { Self::TerminalNotifier }
+            if macos_major_version() >= 12 {
+                Self::Alerter
+            } else {
+                Self::TerminalNotifier
+            }
         } else {
             Self::Dunstify
         }
@@ -117,13 +121,13 @@ impl NotifMethod {
 #[derive(Clone, PartialEq, Debug)]
 pub enum HookEvent {
     // ── Notification sub-types (key: "Notification") ──────────────────────
-    NotificationIdle,            // idle_prompt
-    NotificationPermission,      // permission_prompt
-    NotificationAuth,            // auth_success
-    NotificationElicitDialog,    // elicitation_dialog
-    NotificationElicitComplete,  // elicitation_complete
-    NotificationElicitResponse,  // elicitation_response
-    AllNotifications,            // all Notification sub-types
+    NotificationIdle,           // idle_prompt
+    NotificationPermission,     // permission_prompt
+    NotificationAuth,           // auth_success
+    NotificationElicitDialog,   // elicitation_dialog
+    NotificationElicitComplete, // elicitation_complete
+    NotificationElicitResponse, // elicitation_response
+    AllNotifications,           // all Notification sub-types
 
     // ── Turn lifecycle ────────────────────────────────────────────────────
     Stop,        // Claude finished responding
@@ -154,74 +158,74 @@ impl HookEvent {
             | Self::NotificationElicitDialog
             | Self::NotificationElicitComplete
             | Self::NotificationElicitResponse
-            | Self::AllNotifications       => "Notification",
-            Self::Stop                     => "Stop",
-            Self::StopFailure              => "StopFailure",
-            Self::PostToolUse              => "PostToolUse",
-            Self::PostToolUseFailure       => "PostToolUseFailure",
-            Self::SubagentStop             => "SubagentStop",
-            Self::TeammateIdle             => "TeammateIdle",
-            Self::TaskCreated              => "TaskCreated",
-            Self::TaskCompleted            => "TaskCompleted",
-            Self::SessionStart             => "SessionStart",
-            Self::SessionEnd               => "SessionEnd",
+            | Self::AllNotifications => "Notification",
+            Self::Stop => "Stop",
+            Self::StopFailure => "StopFailure",
+            Self::PostToolUse => "PostToolUse",
+            Self::PostToolUseFailure => "PostToolUseFailure",
+            Self::SubagentStop => "SubagentStop",
+            Self::TeammateIdle => "TeammateIdle",
+            Self::TaskCreated => "TaskCreated",
+            Self::TaskCompleted => "TaskCompleted",
+            Self::SessionStart => "SessionStart",
+            Self::SessionEnd => "SessionEnd",
         }
     }
 
     /// Matcher within the event key. Empty = match all instances.
     pub fn matcher(&self) -> &'static str {
         match self {
-            Self::NotificationIdle           => "idle_prompt",
-            Self::NotificationPermission     => "permission_prompt",
-            Self::NotificationAuth           => "auth_success",
-            Self::NotificationElicitDialog   => "elicitation_dialog",
+            Self::NotificationIdle => "idle_prompt",
+            Self::NotificationPermission => "permission_prompt",
+            Self::NotificationAuth => "auth_success",
+            Self::NotificationElicitDialog => "elicitation_dialog",
             Self::NotificationElicitComplete => "elicitation_complete",
             Self::NotificationElicitResponse => "elicitation_response",
-            _                                => "", // match all for this event key
+            _ => "", // match all for this event key
         }
     }
 
     pub fn label(&self) -> &'static str {
         match self {
-            Self::NotificationIdle           => "idle_prompt",
-            Self::NotificationPermission     => "permission_prompt",
-            Self::NotificationAuth           => "auth_success",
-            Self::NotificationElicitDialog   => "elicitation_dialog",
+            Self::NotificationIdle => "idle_prompt",
+            Self::NotificationPermission => "permission_prompt",
+            Self::NotificationAuth => "auth_success",
+            Self::NotificationElicitDialog => "elicitation_dialog",
             Self::NotificationElicitComplete => "elicitation_complete",
             Self::NotificationElicitResponse => "elicitation_response",
-            Self::AllNotifications           => "all notifications",
-            Self::Stop                       => "Stop",
-            Self::StopFailure                => "StopFailure",
-            Self::PostToolUse                => "PostToolUse",
-            Self::PostToolUseFailure         => "PostToolUseFailure",
-            Self::SubagentStop               => "SubagentStop",
-            Self::TeammateIdle               => "TeammateIdle",
-            Self::TaskCreated                => "TaskCreated",
-            Self::TaskCompleted              => "TaskCompleted",
-            Self::SessionStart               => "SessionStart",
-            Self::SessionEnd                 => "SessionEnd",
+            Self::AllNotifications => "all notifications",
+            Self::Stop => "Stop",
+            Self::StopFailure => "StopFailure",
+            Self::PostToolUse => "PostToolUse",
+            Self::PostToolUseFailure => "PostToolUseFailure",
+            Self::SubagentStop => "SubagentStop",
+            Self::TeammateIdle => "TeammateIdle",
+            Self::TaskCreated => "TaskCreated",
+            Self::TaskCompleted => "TaskCompleted",
+            Self::SessionStart => "SessionStart",
+            Self::SessionEnd => "SessionEnd",
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::NotificationIdle           => "Claude finished a task and is waiting for you",
-            Self::NotificationPermission     => "Claude needs your approval before running a tool",
-            Self::NotificationAuth           => "Authentication token was refreshed",
-            Self::NotificationElicitDialog   => "An MCP server is asking you a question via Claude",
+            Self::NotificationIdle => "Claude finished a task and is waiting for you",
+            Self::NotificationPermission => "Claude needs your approval before running a tool",
+            Self::NotificationAuth => "Authentication token was refreshed",
+            Self::NotificationElicitDialog => "An MCP server is asking you a question via Claude",
             Self::NotificationElicitComplete => "An MCP elicitation dialog finished",
             Self::NotificationElicitResponse => "Your response was submitted to an MCP server",
-            Self::AllNotifications           => "All 6 Notification sub-types",
-            Self::Stop                       => "Claude finished responding (good for long tasks)",
-            Self::StopFailure                => "Turn ended due to an API error",
-            Self::PostToolUse                => "A tool call completed successfully",
-            Self::PostToolUseFailure         => "A tool call failed",
-            Self::SubagentStop               => "A subagent finished its work",
-            Self::TeammateIdle               => "A teammate agent is waiting for your input",
-            Self::TaskCreated                => "A new task was created via TaskCreate",
-            Self::TaskCompleted              => "A task was marked as completed",
-            Self::SessionStart               => "A Claude Code session started or resumed",
-            Self::SessionEnd                 => "A Claude Code session ended",
+            Self::AllNotifications => "All 6 Notification sub-types",
+            Self::Stop => "Claude finished responding (good for long tasks)",
+            Self::StopFailure => "Turn ended due to an API error",
+            Self::PostToolUse => "A tool call completed successfully",
+            Self::PostToolUseFailure => "A tool call failed",
+            Self::SubagentStop => "A subagent finished its work",
+            Self::TeammateIdle => "A teammate agent is waiting for your input",
+            Self::TaskCreated => "A new task was created via TaskCreate",
+            Self::TaskCompleted => "A task was marked as completed",
+            Self::SessionStart => "A Claude Code session started or resumed",
+            Self::SessionEnd => "A Claude Code session ended",
         }
     }
 
@@ -233,11 +237,12 @@ impl HookEvent {
             | Self::NotificationElicitDialog
             | Self::NotificationElicitComplete
             | Self::NotificationElicitResponse
-            | Self::AllNotifications    => "Notifications",
+            | Self::AllNotifications => "Notifications",
             Self::Stop | Self::StopFailure => "Turn",
             Self::PostToolUse | Self::PostToolUseFailure => "Tools",
-            Self::SubagentStop | Self::TeammateIdle
-            | Self::TaskCreated | Self::TaskCompleted => "Agents & Tasks",
+            Self::SubagentStop | Self::TeammateIdle | Self::TaskCreated | Self::TaskCompleted => {
+                "Agents & Tasks"
+            }
             Self::SessionStart | Self::SessionEnd => "Session",
         }
     }
@@ -283,8 +288,12 @@ pub fn install() -> Result<()> {
                         if !try_install_alerter() {
                             eprintln!("warning: alerter installation failed.");
                             eprintln!("  Install manually:");
-                            eprintln!("    brew tap vjeantet/tap && brew install vjeantet/tap/alerter");
-                            eprintln!("  Or download from https://github.com/vjeantet/alerter/releases");
+                            eprintln!(
+                                "    brew tap vjeantet/tap && brew install vjeantet/tap/alerter"
+                            );
+                            eprintln!(
+                                "  Or download from https://github.com/vjeantet/alerter/releases"
+                            );
                             eprintln!("  Falling back to osascript.");
                         }
                     }
@@ -326,12 +335,20 @@ pub fn uninstall() -> Result<()> {
 fn try_install_alerter() -> bool {
     // Try Homebrew tap first (works when Xcode CLT is present).
     let brew = std::process::Command::new("sh")
-        .args(["-c", "brew tap vjeantet/tap 2>/dev/null && brew install vjeantet/tap/alerter 2>/dev/null"])
+        .args([
+            "-c",
+            "brew tap vjeantet/tap 2>/dev/null && brew install vjeantet/tap/alerter 2>/dev/null",
+        ])
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
-    if brew && std::process::Command::new("which").arg("alerter").output()
-        .map(|o| o.status.success()).unwrap_or(false) {
+    if brew
+        && std::process::Command::new("which")
+            .arg("alerter")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    {
         return true;
     }
 
@@ -391,7 +408,7 @@ fn build_registrations(events: &[HookEvent]) -> Vec<(String, String)> {
     let mut map: BTreeMap<&str, Option<Vec<&str>>> = BTreeMap::new();
 
     for event in events {
-        let key     = event.event_key();
+        let key = event.event_key();
         let matcher = event.matcher();
 
         match map.entry(key) {
@@ -648,12 +665,18 @@ mod tests {
     #[test]
     fn test_build_registrations_single_notification() {
         let r = build_registrations(&[HookEvent::NotificationIdle]);
-        assert_eq!(r, vec![("Notification".to_string(), "idle_prompt".to_string())]);
+        assert_eq!(
+            r,
+            vec![("Notification".to_string(), "idle_prompt".to_string())]
+        );
     }
 
     #[test]
     fn test_build_registrations_multiple_notification_sub_types() {
-        let r = build_registrations(&[HookEvent::NotificationIdle, HookEvent::NotificationPermission]);
+        let r = build_registrations(&[
+            HookEvent::NotificationIdle,
+            HookEvent::NotificationPermission,
+        ]);
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].0, "Notification");
         assert!(r[0].1.contains("idle_prompt"));

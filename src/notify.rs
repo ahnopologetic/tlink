@@ -5,31 +5,31 @@ use std::process::Command;
 
 #[derive(Deserialize, Default)]
 struct Payload {
-    hook_event_name:   Option<String>,
+    hook_event_name: Option<String>,
     // Notification
     notification_type: Option<String>,
-    message:           Option<String>,
+    message: Option<String>,
     // StopFailure
-    error_type:        Option<String>,
+    error_type: Option<String>,
     // Tool events
-    tool_name:         Option<String>,
+    tool_name: Option<String>,
     // Agent events
-    agent_type:        Option<String>,
+    agent_type: Option<String>,
     // Task events
-    task_title:        Option<String>,
+    task_title: Option<String>,
     // Session events
-    reason:            Option<String>,
+    reason: Option<String>,
 }
 
 fn type_to_title(t: &str) -> &'static str {
     match t {
-        "idle_prompt"          => "Waiting for your input",
-        "permission_prompt"    => "Permission needed",
-        "auth_success"         => "Authenticated",
-        "elicitation_dialog"   => "MCP: question for you",
+        "idle_prompt" => "Waiting for your input",
+        "permission_prompt" => "Permission needed",
+        "auth_success" => "Authenticated",
+        "elicitation_dialog" => "MCP: question for you",
         "elicitation_complete" => "MCP: dialog complete",
         "elicitation_response" => "MCP: response submitted",
-        _                      => "Claude Code",
+        _ => "Claude Code",
     }
 }
 
@@ -43,15 +43,6 @@ fn applescript_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-
-fn terminal_notifier_available() -> bool {
-    Command::new("which")
-        .arg("terminal-notifier")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
 fn alerter_available() -> bool {
     Command::new("which")
         .arg("alerter")
@@ -63,8 +54,15 @@ fn alerter_available() -> bool {
 fn resolve(payload: &Payload) -> (String, String) {
     match payload.hook_event_name.as_deref().unwrap_or("Notification") {
         "Notification" => {
-            let t = payload.notification_type.as_deref().map(type_to_title).unwrap_or("Claude Code");
-            let m = payload.message.clone().unwrap_or_else(|| "Claude notification".into());
+            let t = payload
+                .notification_type
+                .as_deref()
+                .map(type_to_title)
+                .unwrap_or("Claude Code");
+            let m = payload
+                .message
+                .clone()
+                .unwrap_or_else(|| "Claude notification".into());
             (t.into(), m)
         }
         "Stop" => (
@@ -73,11 +71,17 @@ fn resolve(payload: &Payload) -> (String, String) {
         ),
         "StopFailure" => (
             "Claude error".into(),
-            format!("Turn failed: {}", payload.error_type.as_deref().unwrap_or("unknown error")),
+            format!(
+                "Turn failed: {}",
+                payload.error_type.as_deref().unwrap_or("unknown error")
+            ),
         ),
         "PostToolUse" => (
             "Tool completed".into(),
-            format!("{} finished", payload.tool_name.as_deref().unwrap_or("Tool")),
+            format!(
+                "{} finished",
+                payload.tool_name.as_deref().unwrap_or("Tool")
+            ),
         ),
         "PostToolUseFailure" => (
             "Tool failed".into(),
@@ -85,21 +89,39 @@ fn resolve(payload: &Payload) -> (String, String) {
         ),
         "SubagentStop" => (
             "Subagent done".into(),
-            format!("{} subagent finished", payload.agent_type.as_deref().unwrap_or("A")),
+            format!(
+                "{} subagent finished",
+                payload.agent_type.as_deref().unwrap_or("A")
+            ),
         ),
         "TeammateIdle" => (
             "Teammate idle".into(),
-            format!("{} is waiting for your input", payload.agent_type.as_deref().unwrap_or("Teammate")),
+            format!(
+                "{} is waiting for your input",
+                payload.agent_type.as_deref().unwrap_or("Teammate")
+            ),
         ),
         "TaskCreated" => (
             "Task created".into(),
-            payload.task_title.clone().unwrap_or_else(|| "New task".into()),
+            payload
+                .task_title
+                .clone()
+                .unwrap_or_else(|| "New task".into()),
         ),
-        "TaskCompleted" => ("Task complete".into(), "A task was marked as completed.".into()),
-        "SessionStart"  => ("Session started".into(), "A Claude Code session has started.".into()),
-        "SessionEnd"    => (
+        "TaskCompleted" => (
+            "Task complete".into(),
+            "A task was marked as completed.".into(),
+        ),
+        "SessionStart" => (
+            "Session started".into(),
+            "A Claude Code session has started.".into(),
+        ),
+        "SessionEnd" => (
             "Session ended".into(),
-            format!("Session ended: {}", payload.reason.as_deref().unwrap_or("unknown")),
+            format!(
+                "Session ended: {}",
+                payload.reason.as_deref().unwrap_or("unknown")
+            ),
         ),
         other => ("Claude Code".into(), format!("{} event", other)),
     }
@@ -136,8 +158,8 @@ fn fire(method: &str, title: &str, message: &str, location: &str, deeplink: &str
                 "ACTION=$(dunstify {t} {m} --action='default,Go there' \
                     --urgency=normal --icon=utilities-terminal --appname='Claude Code'); \
                  [ \"$ACTION\" = \"default\" ] && tlink open {dl}",
-                t  = sh_quote(title),
-                m  = sh_quote(message),
+                t = sh_quote(title),
+                m = sh_quote(message),
                 dl = sh_quote(deeplink),
             );
             Command::new("sh").args(["-c", &cmd]).spawn()?;
@@ -187,25 +209,34 @@ fn fire_alerter(title: &str, message: &str, location: &str, deeplink: &str) -> R
         "result=$(alerter --title {t} --subtitle {loc} --message {m} \
             --actions 'Open' --close-label 'Dismiss' --sound 'Glass' --timeout 60); \
          case \"$result\" in @CONTENTCLICKED|@ACTIONCLICKED) open {dl} ;; esac",
-        t   = sh_quote(title),
+        t = sh_quote(title),
         loc = sh_quote(location),
-        m   = sh_quote(message),
-        dl  = sh_quote(deeplink),
+        m = sh_quote(message),
+        dl = sh_quote(deeplink),
     );
     Command::new("sh").args(["-c", &cmd]).spawn()?;
     Ok(())
 }
 
-fn fire_terminal_notifier(title: &str, message: &str, location: &str, deeplink: &str) -> Result<()> {
+fn fire_terminal_notifier(
+    title: &str,
+    message: &str,
+    location: &str,
+    deeplink: &str,
+) -> Result<()> {
     Command::new("terminal-notifier")
         .args([
-            "-title",    title,
-            "-subtitle", location,
-            "-message",  message,
+            "-title",
+            title,
+            "-subtitle",
+            location,
+            "-message",
+            message,
             // -execute is broken on macOS 12+ (command never fires).
             // -open invokes the registered OS URL scheme handler on click,
             // which routes through tlink's tmux:// handler without PATH issues.
-            "-open",     deeplink,
+            "-open",
+            deeplink,
         ])
         .spawn()?;
     Ok(())
@@ -217,16 +248,16 @@ mod tests {
 
     #[test]
     fn test_type_to_title_known_types() {
-        assert_eq!(type_to_title("idle_prompt"),       "Waiting for your input");
+        assert_eq!(type_to_title("idle_prompt"), "Waiting for your input");
         assert_eq!(type_to_title("permission_prompt"), "Permission needed");
-        assert_eq!(type_to_title("auth_success"),      "Authenticated");
+        assert_eq!(type_to_title("auth_success"), "Authenticated");
         assert_eq!(type_to_title("elicitation_dialog"), "MCP: question for you");
     }
 
     #[test]
     fn test_type_to_title_unknown_falls_back() {
         assert_eq!(type_to_title("unknown_type"), "Claude Code");
-        assert_eq!(type_to_title(""),             "Claude Code");
+        assert_eq!(type_to_title(""), "Claude Code");
     }
 
     #[test]

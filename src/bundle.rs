@@ -107,7 +107,11 @@ pub fn create() -> Result<()> {
 
     let handler_bin = macos.join("TmuxLink");
     let status = Command::new("swiftc")
-        .args([swift_file.to_str().unwrap(), "-o", handler_bin.to_str().unwrap()])
+        .args([
+            swift_file.to_str().unwrap(),
+            "-o",
+            handler_bin.to_str().unwrap(),
+        ])
         .status()?;
     if !status.success() {
         bail!("swiftc failed — is Xcode Command Line Tools installed? Run: xcode-select --install");

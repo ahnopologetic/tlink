@@ -53,44 +53,64 @@ impl EventOpt {
         // (event, default_selected)
         let defs: &[(HookEvent, bool)] = &[
             // Notifications
-            (NotificationIdle,            true),
-            (NotificationPermission,      true),
-            (NotificationAuth,            false),
-            (NotificationElicitDialog,    false),
-            (NotificationElicitComplete,  false),
-            (NotificationElicitResponse,  false),
-            (AllNotifications,            false),
+            (NotificationIdle, true),
+            (NotificationPermission, true),
+            (NotificationAuth, false),
+            (NotificationElicitDialog, false),
+            (NotificationElicitComplete, false),
+            (NotificationElicitResponse, false),
+            (AllNotifications, false),
             // Turn
-            (Stop,                        true),
-            (StopFailure,                 false),
+            (Stop, true),
+            (StopFailure, false),
             // Tools
-            (PostToolUse,                 false),
-            (PostToolUseFailure,          false),
+            (PostToolUse, false),
+            (PostToolUseFailure, false),
             // Agents & Tasks
-            (SubagentStop,                false),
-            (TeammateIdle,                false),
-            (TaskCreated,                 false),
-            (TaskCompleted,               false),
+            (SubagentStop, false),
+            (TeammateIdle, false),
+            (TaskCreated, false),
+            (TaskCompleted, false),
             // Session
-            (SessionStart,                false),
-            (SessionEnd,                  false),
+            (SessionStart, false),
+            (SessionEnd, false),
         ];
-        defs.iter().map(|(e, s)| Self { event: e.clone(), selected: *s }).collect()
+        defs.iter()
+            .map(|(e, s)| Self {
+                event: e.clone(),
+                selected: *s,
+            })
+            .collect()
     }
 }
 
-pub const CATEGORIES: &[&str] = &["Notifications", "Turn", "Tools", "Agents & Tasks", "Session"];
+pub const CATEGORIES: &[&str] = &[
+    "Notifications",
+    "Turn",
+    "Tools",
+    "Agents & Tasks",
+    "Session",
+];
 
 /// Returns the indices into `events` that are visible given the current tab and search query.
 pub fn visible_indices(events: &[EventOpt], search: &str, active_tab: usize) -> Vec<usize> {
     let q = search.to_lowercase();
-    events.iter().enumerate().filter_map(|(i, e)| {
-        let tab_match = active_tab == 0 || CATEGORIES.get(active_tab - 1) == Some(&e.event.category());
-        let search_match = q.is_empty()
-            || e.event.label().to_lowercase().contains(&q)
-            || e.event.description().to_lowercase().contains(&q);
-        if tab_match && search_match { Some(i) } else { None }
-    }).collect()
+    events
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| {
+            let tab_match =
+                active_tab == 0 || CATEGORIES.get(active_tab - 1) == Some(&e.event.category());
+            let search_match = q.is_empty()
+                || e.event.label().to_lowercase().contains(&q)
+                || e.event.description().to_lowercase().contains(&q);
+            if tab_match && search_match {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 pub fn next_state(state: State, key: KeyCode) -> State {
@@ -131,46 +151,161 @@ pub fn next_state(state: State, key: KeyCode) -> State {
         (State::SelectMethod { .. }, KeyCode::Char('q') | KeyCode::Esc) => State::Cancelled,
 
         // SelectEvents — Tab cycles categories, typing filters, Space toggles, Enter confirms
-        (State::SelectEvents { events, cursor, search, active_tab }, KeyCode::Tab) => {
+        (
+            State::SelectEvents {
+                events,
+                cursor: _,
+                search: _,
+                active_tab,
+            },
+            KeyCode::Tab,
+        ) => {
             let n_tabs = CATEGORIES.len() + 1; // 0 = All, 1..=N = category
             let next_tab = (active_tab + 1) % n_tabs;
-            State::SelectEvents { events, cursor: 0, search: String::new(), active_tab: next_tab }
+            State::SelectEvents {
+                events,
+                cursor: 0,
+                search: String::new(),
+                active_tab: next_tab,
+            }
         }
-        (State::SelectEvents { events, cursor, search, active_tab }, KeyCode::Up) => {
+        (
+            State::SelectEvents {
+                events,
+                cursor,
+                search,
+                active_tab,
+            },
+            KeyCode::Up,
+        ) => {
             let visible = visible_indices(&events, &search, active_tab);
             let pos = visible.iter().position(|&i| i == cursor).unwrap_or(0);
-            let new_cursor = visible.get(pos.saturating_sub(1)).copied().unwrap_or(cursor);
-            State::SelectEvents { events, cursor: new_cursor, search, active_tab }
+            let new_cursor = visible
+                .get(pos.saturating_sub(1))
+                .copied()
+                .unwrap_or(cursor);
+            State::SelectEvents {
+                events,
+                cursor: new_cursor,
+                search,
+                active_tab,
+            }
         }
-        (State::SelectEvents { events, cursor, search, active_tab }, KeyCode::Down) => {
+        (
+            State::SelectEvents {
+                events,
+                cursor,
+                search,
+                active_tab,
+            },
+            KeyCode::Down,
+        ) => {
             let visible = visible_indices(&events, &search, active_tab);
             let pos = visible.iter().position(|&i| i == cursor).unwrap_or(0);
-            let new_cursor = visible.get((pos + 1).min(visible.len().saturating_sub(1))).copied().unwrap_or(cursor);
-            State::SelectEvents { events, cursor: new_cursor, search, active_tab }
+            let new_cursor = visible
+                .get((pos + 1).min(visible.len().saturating_sub(1)))
+                .copied()
+                .unwrap_or(cursor);
+            State::SelectEvents {
+                events,
+                cursor: new_cursor,
+                search,
+                active_tab,
+            }
         }
-        (State::SelectEvents { mut events, cursor, search, active_tab }, KeyCode::Char(' ')) => {
+        (
+            State::SelectEvents {
+                mut events,
+                cursor,
+                search,
+                active_tab,
+            },
+            KeyCode::Char(' '),
+        ) => {
             events[cursor].selected = !events[cursor].selected;
-            State::SelectEvents { events, cursor, search, active_tab }
+            State::SelectEvents {
+                events,
+                cursor,
+                search,
+                active_tab,
+            }
         }
-        (State::SelectEvents { events, search, active_tab, .. }, KeyCode::Enter) => {
+        (
+            State::SelectEvents {
+                events,
+                search,
+                active_tab,
+                ..
+            },
+            KeyCode::Enter,
+        ) => {
             if !search.is_empty() {
                 // Enter while searching: commit first visible match's toggle, clear search
-                return State::SelectEvents { events, cursor: 0, search: String::new(), active_tab };
+                return State::SelectEvents {
+                    events,
+                    cursor: 0,
+                    search: String::new(),
+                    active_tab,
+                };
             }
-            let selected: Vec<HookEvent> = events.iter().filter(|e| e.selected).map(|e| e.event.clone()).collect();
-            let events_final = if selected.is_empty() { vec![HookEvent::NotificationIdle] } else { selected };
-            State::Confirm { method: NotifMethod::Osascript, events: events_final }
+            let selected: Vec<HookEvent> = events
+                .iter()
+                .filter(|e| e.selected)
+                .map(|e| e.event.clone())
+                .collect();
+            let events_final = if selected.is_empty() {
+                vec![HookEvent::NotificationIdle]
+            } else {
+                selected
+            };
+            State::Confirm {
+                method: NotifMethod::Osascript,
+                events: events_final,
+            }
         }
-        (State::SelectEvents { events, mut search, active_tab, cursor }, KeyCode::Backspace) => {
+        (
+            State::SelectEvents {
+                events,
+                mut search,
+                active_tab,
+                cursor: _,
+            },
+            KeyCode::Backspace,
+        ) => {
             search.pop();
-            let new_cursor = visible_indices(&events, &search, active_tab).first().copied().unwrap_or(0);
-            State::SelectEvents { events, cursor: new_cursor, search, active_tab }
+            let new_cursor = visible_indices(&events, &search, active_tab)
+                .first()
+                .copied()
+                .unwrap_or(0);
+            State::SelectEvents {
+                events,
+                cursor: new_cursor,
+                search,
+                active_tab,
+            }
         }
-        (State::SelectEvents { events, mut search, active_tab, cursor }, KeyCode::Char(c)) => {
+        (
+            State::SelectEvents {
+                events,
+                mut search,
+                active_tab,
+                cursor,
+            },
+            KeyCode::Char(c),
+        ) => {
             search.push(c);
             let visible = visible_indices(&events, &search, active_tab);
-            let new_cursor = if visible.contains(&cursor) { cursor } else { visible.first().copied().unwrap_or(cursor) };
-            State::SelectEvents { events, cursor: new_cursor, search, active_tab }
+            let new_cursor = if visible.contains(&cursor) {
+                cursor
+            } else {
+                visible.first().copied().unwrap_or(cursor)
+            };
+            State::SelectEvents {
+                events,
+                cursor: new_cursor,
+                search,
+                active_tab,
+            }
         }
         (State::SelectEvents { .. }, KeyCode::Esc) => State::Cancelled,
 
@@ -318,18 +453,30 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                 .enumerate()
                 .map(|(i, m)| {
                     let selected = i == *cursor;
-                    let is_rec   = m == &rec;
+                    let is_rec = m == &rec;
                     let prefix = if selected { "❯ " } else { "  " };
                     let name_style = if selected {
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default()
                     };
                     let tag = if is_rec {
                         if m.available() {
-                            Span::styled("[★ recommended]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                            Span::styled(
+                                "[★ recommended]",
+                                Style::default()
+                                    .fg(Color::Cyan)
+                                    .add_modifier(Modifier::BOLD),
+                            )
                         } else {
-                            Span::styled("[★ recommended — needs install]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                            Span::styled(
+                                "[★ recommended — needs install]",
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            )
                         }
                     } else if m.available() {
                         Span::styled("[ok]", Style::default().fg(Color::Green))
@@ -365,7 +512,12 @@ fn render(f: &mut ratatui::Frame, state: &State) {
             f.render_stateful_widget(list, content, &mut ls);
         }
 
-        State::SelectEvents { events, cursor, search, active_tab } => {
+        State::SelectEvents {
+            events,
+            cursor,
+            search,
+            active_tab,
+        } => {
             // Split content into tabs + list + search bar
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -382,7 +534,9 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                 .enumerate()
                 .flat_map(|(i, label)| {
                     let sty = if i == *active_tab {
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
                     } else {
                         Style::default().fg(Color::DarkGray)
                     };
@@ -402,10 +556,14 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                 if *active_tab == 0 {
                     let cat = e.event.category();
                     if cat != prev_cat {
-                        if !lines.is_empty() { lines.push(Line::from("")); }
+                        if !lines.is_empty() {
+                            lines.push(Line::from(""));
+                        }
                         lines.push(Line::from(Span::styled(
                             format!(" {} ", cat),
-                            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
                         )));
                         prev_cat = cat;
                     }
@@ -413,14 +571,30 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                 let on_cursor = i == *cursor;
                 let prefix = if on_cursor { "❯ " } else { "  " };
                 let check = if e.selected {
-                    Span::styled("[x] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
+                    Span::styled(
+                        "[x] ",
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     Span::styled("[ ] ", Style::default().fg(Color::DarkGray))
                 };
-                let label_sty = if on_cursor { Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD) } else { Style::default() };
-                let desc_sty  = if on_cursor { Style::default().fg(Color::White) } else { Style::default().fg(Color::DarkGray) };
+                let label_sty = if on_cursor {
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                let desc_sty = if on_cursor {
+                    Style::default().fg(Color::White)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
                 lines.push(Line::from(vec![
-                    Span::raw(prefix), check,
+                    Span::raw(prefix),
+                    check,
                     Span::styled(e.event.label(), label_sty),
                     Span::raw("  "),
                     Span::styled(e.event.description(), desc_sty),
@@ -428,7 +602,10 @@ fn render(f: &mut ratatui::Frame, state: &State) {
             }
 
             if visible.is_empty() {
-                lines.push(Line::from(Span::styled("  no matches", Style::default().fg(Color::DarkGray))));
+                lines.push(Line::from(Span::styled(
+                    "  no matches",
+                    Style::default().fg(Color::DarkGray),
+                )));
             }
 
             f.render_widget(
@@ -440,7 +617,10 @@ fn render(f: &mut ratatui::Frame, state: &State) {
 
             // ── Search bar ────────────────────────────────────────────────
             let search_line = if search.is_empty() {
-                Line::from(Span::styled("  / search…", Style::default().fg(Color::DarkGray)))
+                Line::from(Span::styled(
+                    "  / search…",
+                    Style::default().fg(Color::DarkGray),
+                ))
             } else {
                 Line::from(vec![
                     Span::styled("  / ", Style::default().fg(Color::Yellow)),
@@ -465,10 +645,11 @@ fn render(f: &mut ratatui::Frame, state: &State) {
                         "  Hook events        : {}",
                         event_labels.join(", ")
                     )),
-                    Line::from(format!(
+                    Line::from(
                         "  Hook script        : ~/.config/tlink/hooks/claude-notification.sh"
-                    )),
-                    Line::from(format!("  Claude settings    : ~/.claude/settings.json")),
+                            .to_string(),
+                    ),
+                    Line::from("  Claude settings    : ~/.claude/settings.json".to_string()),
                     Line::from(""),
                     Line::from(Span::styled(
                         "Enter/y to install  •  n/Esc to cancel",
@@ -537,7 +718,11 @@ mod tests {
 
     fn method_state() -> State {
         State::SelectMethod {
-            methods: vec![NotifMethod::Alerter, NotifMethod::TerminalNotifier, NotifMethod::Osascript],
+            methods: vec![
+                NotifMethod::Alerter,
+                NotifMethod::TerminalNotifier,
+                NotifMethod::Osascript,
+            ],
             cursor: 0,
         }
     }
@@ -633,7 +818,13 @@ mod tests {
     #[test]
     fn test_select_events_enter_defaults_to_idle_when_none_selected() {
         let state = State::SelectEvents {
-            events: EventOpt::all_events().into_iter().map(|mut e| { e.selected = false; e }).collect(),
+            events: EventOpt::all_events()
+                .into_iter()
+                .map(|mut e| {
+                    e.selected = false;
+                    e
+                })
+                .collect(),
             cursor: 0,
             search: String::new(),
             active_tab: 0,
@@ -651,10 +842,23 @@ mod tests {
         let events = EventOpt::all_events();
         let types: Vec<&HookEvent> = events.iter().map(|e| &e.event).collect();
         for expected in &[
-            NotificationIdle, NotificationPermission, NotificationAuth,
-            NotificationElicitDialog, NotificationElicitComplete, NotificationElicitResponse,
-            AllNotifications, Stop, StopFailure, PostToolUse, PostToolUseFailure,
-            SubagentStop, TeammateIdle, TaskCreated, TaskCompleted, SessionStart, SessionEnd,
+            NotificationIdle,
+            NotificationPermission,
+            NotificationAuth,
+            NotificationElicitDialog,
+            NotificationElicitComplete,
+            NotificationElicitResponse,
+            AllNotifications,
+            Stop,
+            StopFailure,
+            PostToolUse,
+            PostToolUseFailure,
+            SubagentStop,
+            TeammateIdle,
+            TaskCreated,
+            TaskCompleted,
+            SessionStart,
+            SessionEnd,
         ] {
             assert!(types.contains(&expected), "missing {:?}", expected);
         }

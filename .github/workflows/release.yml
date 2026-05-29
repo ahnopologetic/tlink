@@ -12,21 +12,18 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.optional || false }}
-    timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # macOS — native runners
-          - os: macos-latest   # arm64 (macos-14+)
+          # macOS — both targets built on the arm64 runner; x86_64 cross-compiles via the macOS SDK
+          # (avoids macos-13 Intel runners which have long queue times and are being phased out)
+          - os: macos-latest
             target: aarch64-apple-darwin
             use_cross: false
-          - os: macos-13       # x86_64 — Intel runners are sometimes unavailable; skip rather than block the release
+          - os: macos-latest
             target: x86_64-apple-darwin
             use_cross: false
-            optional: true
-            timeout_minutes: 45
 
           # Linux x86_64 — native runner
           - os: ubuntu-latest

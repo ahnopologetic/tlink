@@ -30,6 +30,9 @@ impl NotificationAdapter for TerminalNotifierAdapter {
         let args = self.build_args(req);
         std::process::Command::new("terminal-notifier")
             .args(&args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()?;
         Ok(())
     }

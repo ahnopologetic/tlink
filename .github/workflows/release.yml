@@ -12,16 +12,21 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional || false }}
+    timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           # macOS — native runners
           - os: macos-latest   # arm64 (macos-14+)
             target: aarch64-apple-darwin
             use_cross: false
-          - os: macos-13       # x86_64
+          - os: macos-13       # x86_64 — Intel runners are sometimes unavailable; skip rather than block the release
             target: x86_64-apple-darwin
             use_cross: false
+            optional: true
+            timeout_minutes: 45
 
           # Linux x86_64 — native runner
           - os: ubuntu-latest
@@ -98,12 +103,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/tlink-aarch64-apple-darwin
-            artifacts/tlink-x86_64-apple-darwin
-            artifacts/tlink-x86_64-unknown-linux-gnu
-            artifacts/tlink-x86_64-unknown-linux-musl
-            artifacts/tlink-aarch64-unknown-linux-gnu
-            artifacts/tlink-aarch64-unknown-linux-musl
-            artifacts/tlink-armv7-unknown-linux-gnueabihf
+            artifacts/tlink-*
             artifacts/checksums.txt
           generate_release_notes: true

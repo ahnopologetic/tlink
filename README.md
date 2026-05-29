@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ahnopologetic/tlink/main/assets/tlink-logo.png" alt="tlink logo" width="200">
+</p>
+
+---
+
 # tlink
 
 `tmux://` deeplink CLI for macOS — jump to any tmux session, window, or pane from a URL.

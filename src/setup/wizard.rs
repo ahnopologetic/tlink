@@ -101,7 +101,18 @@ pub fn next_state(state: WizardState, key: KeyCode) -> WizardState {
         }
 
         (WizardState::Confirm { terminal }, KeyCode::Enter | KeyCode::Char('y')) => {
-            WizardState::TelemetryPrompt { terminal }
+            // Skip telemetry prompt if user already decided
+            let telemetry_decided = crate::config::load()
+                .ok()
+                .and_then(|c| c.telemetry_enabled)
+                .is_some();
+            if telemetry_decided {
+                WizardState::Installing {
+                    terminal_name: terminal,
+                }
+            } else {
+                WizardState::TelemetryPrompt { terminal }
+            }
         }
         (WizardState::Confirm { .. }, KeyCode::Char('n') | KeyCode::Esc) => WizardState::Cancelled,
 
@@ -289,15 +300,10 @@ fn render(f: &mut ratatui::Frame, state: &WizardState) {
                         Style::default().add_modifier(Modifier::BOLD),
                     )),
                     Line::from(""),
-                    Line::from("Share anonymous usage data to help improve tlink."),
-                    Line::from(""),
-                    Line::from("Collected:"),
-                    Line::from("  • commands you run (open, notify, install...)"),
-                    Line::from("  • success/failure of each command"),
-                    Line::from("  • version and platform (macOS / Linux)"),
-                    Line::from("  • error backtraces if something crashes"),
-                    Line::from(""),
-                    Line::from("Not collected: no personal info, no terminal content"),
+                    Line::from(
+                        "Share anonymous usage data to help improve tlink.",
+                    ),
+                    Line::from("No personal info collected. See tlink telemetry status."),
                     Line::from(""),
                     Line::from(Span::styled(
                         "y/Enter: enable  •  n: skip  •  Esc: cancel",

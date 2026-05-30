@@ -18,13 +18,17 @@ fn tlink_cmd(args: &[&str]) -> Command {
             .and_then(|p| p.parent().and_then(|p| p.parent()).map(|p| p.join("tlink"))),
     ];
 
+    eprintln!("[tlink] CWD={:?}", std::env::current_dir());
     for candidate in candidates.into_iter().flatten() {
+        let resolved = std::fs::canonicalize(&candidate).ok();
+        let is_f = candidate.is_file();
         eprintln!(
-            "[tlink] trying: {} (is_file={})",
+            "[tlink] trying: {} is_file={} canonical={:?}",
             candidate.display(),
-            candidate.is_file()
+            is_f,
+            resolved
         );
-        if candidate.is_file() {
+        if is_f {
             let mut c = Command::new(&candidate);
             c.args(args);
             return c;

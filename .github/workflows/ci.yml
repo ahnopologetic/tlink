@@ -18,10 +18,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install system deps (tmux for integration tests)
+      - name: Install system deps (tmux + notify-send for integration tests)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq tmux python3
+          sudo apt-get install -y -qq tmux python3 libnotify-bin
 
       - name: fmt
         run: cargo fmt --check
@@ -45,10 +45,14 @@ jobs:
 
       # Run all tests — integration tests use TLINK_BIN env var to find the
       # pre-built binary copy, avoiding cargo lock conflicts.
-      - name: Run tests
+      - name: Configure notify backend and run tests
         env:
           TLINK_BIN: /tmp/tlink-bin
-        run: cargo test -- --test-threads=4
+        run: |
+          # Set notification method to notify-send (available on ubuntu-latest)
+          mkdir -p ~/.config/tlink
+          echo 'notification_method = "notify-send"' > ~/.config/tlink/config.toml
+          cargo test -- --test-threads=4
 
       - name: Clean up tmux
         if: always()

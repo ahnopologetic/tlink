@@ -1,56 +1,22 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-/// Build a Command for running the tlink binary.
-/// Uses TLINK_BIN env var (set by CI) or falls back to the project binary.
-/// Never uses `cargo run` — causes deadlock with `cargo test` on the package cache.
 fn tlink_cmd(args: &[&str]) -> Command {
-    // TLINK_BIN env var set by CI workflow to a pre-built binary copy
+    // TLINK_BIN set by CI — pre-built copy, avoids lock + test-harness issues
     if let Ok(path) = std::env::var("TLINK_BIN") {
-        let exists = std::path::Path::new(&path).is_file();
-        let can_exec = Command::new(&path)
-            .arg("--version")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        eprintln!("[tlink] TLINK_BIN={path} exists={exists} exec={can_exec:?}");
-        if let Ok(status) = can_exec {
-            if status.success() {
-                let mut c = Command::new(&path);
-                c.args(args);
-                return c;
-            }
-        }
+        let mut c = Command::new(&path);
+        c.args(args);
+        return c;
     }
-
-    // TLINK_DEBUG_BIN fallback for local development
-    for candidate in &["target/debug/tlink-cli", "target/debug/tlink"] {
-        let p = std::path::Path::new(candidate);
-        if p.is_file() {
-            // Quick sanity check: is this a test harness or the real binary?
-            let check = Command::new(p)
-                .arg("--version")
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-            if let Ok(status) = check {
-                if status.success() {
-                    let mut c = Command::new(p);
-                    c.args(args);
-                    return c;
-                }
-            }
-        }
-    }
-
-    panic!("tlink binary not found. Run `cargo build --bin tlink` first.");
+    let mut c = Command::new("cargo");
+    c.arg("run").arg("--").args(args);
+    c
 }
 
 fn check_bash_syntax(script: &str, label: &str) -> bool {
     use std::path::PathBuf;
-    let pid = std::process::id();
-    let tid = std::thread::current().id();
-    let tmp = std::env::temp_dir().join(format!("tlink-syntax-{}-{:?}-{}.sh", pid, tid, label));
+    let tmp =
+        std::env::temp_dir().join(format!("tlink-syntax-{}-{}.sh", std::process::id(), label));
     if std::fs::write(&tmp, script).is_err() {
         return false;
     }
@@ -63,73 +29,65 @@ fn check_bash_syntax(script: &str, label: &str) -> bool {
     ok
 }
 
-fn codex_script(method: &str) -> String {
-    let n = match method {
+fn codex_script(m: &str) -> String {
+    let n = match m {
         "terminal-notifier" => "    terminal-notifier \\\n        -title \"$NOTIF_TITLE\" \\\n        -subtitle \"$LOCATION\" \\\n        -message \"$MESSAGE\" \\\n        -execute \"tlink open $DEEPLINK\" &",
         "osascript" => "    osascript -e \"display notification \\\"$MESSAGE\\\" with title \\\"$NOTIF_TITLE\\\" subtitle \\\"$LOCATION\\\" sound name \\\"Glass\\\"\"",
         "dunstify" => "    (\n        ACTION=$(dunstify \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n            --hint=string:x-dunst-stack-tag:tlink \\\n            --action=\"default,Go there\" \\\n            --urgency=normal \\\n            --icon=utilities-terminal \\\n            --appname=\"Codex CLI\")\n        [ \"$ACTION\" = \"default\" ] && tlink open \"$DEEPLINK\"\n    ) &",
         "notify-send" => "    notify-send \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n        --urgency=normal \\\n        --icon=utilities-terminal \\\n        --app-name=\"Codex CLI\" \\\n        --hint=string:body:\"$LOCATION\"",
-        _ => panic!("unknown method: {method}"),
+        _ => panic!("unknown: {m}"),
     };
     format!("#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nMESSAGE=\"Codex CLI task completed\"\nNOTIF_TITLE=\"Codex CLI\"\nDEEPLINK=\"tmux://${{SESSION}}/${{WINDOW}}/${{PANE}}\"\nLOCATION=\"${{SESSION}} > ${{WINDOW}} > ${{PANE}}\"\n{n}\n")
 }
 
-fn gemini_script(method: &str) -> String {
-    let n = match method {
+fn gemini_script(m: &str) -> String {
+    let n = match m {
         "terminal-notifier" => "    terminal-notifier \\\n        -title \"$NOTIF_TITLE\" \\\n        -subtitle \"$LOCATION\" \\\n        -message \"$MESSAGE\" \\\n        -execute \"tlink open $DEEPLINK\" &",
         "osascript" => "    osascript -e \"display notification \\\"$MESSAGE\\\" with title \\\"$NOTIF_TITLE\\\" subtitle \\\"$LOCATION\\\" sound name \\\"Glass\\\"\"",
         "dunstify" => "    (\n        ACTION=$(dunstify \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n            --hint=string:x-dunst-stack-tag:tlink \\\n            --action=\"default,Go there\" \\\n            --urgency=normal \\\n            --icon=utilities-terminal \\\n            --appname=\"Gemini CLI\")\n        [ \"$ACTION\" = \"default\" ] && tlink open \"$DEEPLINK\"\n    ) &",
         "notify-send" => "    notify-send \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n        --urgency=normal \\\n        --icon=utilities-terminal \\\n        --app-name=\"Gemini CLI\" \\\n        --hint=string:body:\"$LOCATION\"",
-        _ => panic!("unknown method: {method}"),
+        _ => panic!("unknown: {m}"),
     };
     format!("#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nINPUT=$(cat)\nMESSAGE=$(echo \"$INPUT\" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read()); print(d.get(\"message\",\"Gemini CLI notification\"))' 2>/dev/null || echo \"Gemini CLI notification\")\nNOTIF_TITLE=\"Gemini CLI\"\nDEEPLINK=\"tmux://$SESSION/$WINDOW/$PANE\"\nLOCATION=\"$SESSION > $WINDOW > $PANE\"\n{n}\n")
 }
 
-// ── CLI smoke tests ───────────────────────────────────────────────────────────
-
 #[test]
 fn test_tlink_help() {
-    let out = tlink_cmd(&["--help"]).output().unwrap();
-    assert!(out.status.success());
-    assert!(String::from_utf8_lossy(&out.stdout).contains("tlink"));
+    let o = tlink_cmd(&["--help"]).output().unwrap();
+    assert!(o.status.success());
+    assert!(String::from_utf8_lossy(&o.stdout).contains("tlink"));
 }
-
 #[test]
 fn test_tlink_list_addons() {
-    let out = tlink_cmd(&["list", "add-ons"]).output().unwrap();
-    assert!(out.status.success());
-    let s = String::from_utf8_lossy(&out.stdout);
+    let o = tlink_cmd(&["list", "add-ons"]).output().unwrap();
+    assert!(o.status.success());
+    let s = String::from_utf8_lossy(&o.stdout);
     assert!(s.contains("claude-notification"));
     assert!(s.contains("NAME") && s.contains("STATUS"));
 }
-
 #[test]
 fn test_tlink_install_no_args() {
-    let out = tlink_cmd(&["install"]).output().unwrap();
-    let s = String::from_utf8_lossy(&out.stdout);
-    let e = String::from_utf8_lossy(&out.stderr);
-    assert!(out.status.success() || s.contains("Usage") || e.contains("Usage"));
+    let o = tlink_cmd(&["install"]).output().unwrap();
+    let s = String::from_utf8_lossy(&o.stdout);
+    let e = String::from_utf8_lossy(&o.stderr);
+    assert!(o.status.success() || s.contains("Usage") || e.contains("Usage"));
 }
-
 fn has_interactive_flag() -> bool {
     tlink_cmd(&["install", "--help"])
         .output()
         .map(|o| o.status.success() && String::from_utf8_lossy(&o.stdout).contains("--interactive"))
         .unwrap_or(false)
 }
-
 #[test]
 fn test_tlink_install_interactive_flag() {
     if !has_interactive_flag() {
-        eprintln!("  SKIP: --interactive flag not available");
+        eprintln!("  SKIP");
         return;
     }
 }
 
-// ── tlink notify ──────────────────────────────────────────────────────────────
-
-fn notify(payload: &str) -> bool {
-    let mut child = match tlink_cmd(&["notify", "--session", "ts", "--window", "1", "--pane", "0"])
+fn notify(p: &str) -> bool {
+    let mut c = match tlink_cmd(&["notify", "--session", "ts", "--window", "1", "--pane", "0"])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -137,20 +95,20 @@ fn notify(payload: &str) -> bool {
     {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("  could not spawn: {e}");
+            eprintln!("  spawn error: {e}");
             return false;
         }
     };
-    if let Some(mut h) = child.stdin.take() {
-        if let Err(e) = h.write_all(payload.as_bytes()) {
+    if let Some(mut h) = c.stdin.take() {
+        if let Err(e) = h.write_all(p.as_bytes()) {
             eprintln!("  write error: {e}");
             return false;
         }
     }
-    match child.wait_with_output() {
-        Ok(out) if out.status.success() => true,
-        Ok(out) => {
-            eprintln!("  notify failed: {}", String::from_utf8_lossy(&out.stderr));
+    match c.wait_with_output() {
+        Ok(o) if o.status.success() => true,
+        Ok(o) => {
+            eprintln!("  notify failed: {}", String::from_utf8_lossy(&o.stderr));
             false
         }
         Err(e) => {
@@ -207,35 +165,28 @@ fn test_notify_session() {
     assert!(notify(r#"{"hook_event_name":"SessionStart"}"#));
 }
 
-// ── Hook script syntax ────────────────────────────────────────────────────────
-
 #[test]
 fn test_codex_script_syntax() {
     for m in &["terminal-notifier", "osascript", "dunstify", "notify-send"] {
         assert!(
             check_bash_syntax(&codex_script(m), &format!("codex-{m}")),
-            "codex {m} should have valid bash syntax"
+            "codex {m}"
         );
     }
 }
-
 #[test]
 fn test_gemini_script_syntax() {
     for m in &["terminal-notifier", "osascript", "dunstify", "notify-send"] {
         assert!(
             check_bash_syntax(&gemini_script(m), &format!("gemini-{m}")),
-            "gemini {m} should have valid bash syntax"
+            "gemini {m}"
         );
     }
 }
-
 #[test]
 fn test_claude_script_syntax() {
-    let script = "#!/bin/bash\nSESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p '#{window_name}' 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p '#{pane_index}' 2>/dev/null) || exit 0\n[ -z '$SESSION' ] && exit 0\nexec tlink notify --session '$SESSION' --window '$WINDOW' --pane '$PANE'";
-    assert!(check_bash_syntax(script, "claude"));
+    assert!(check_bash_syntax("#!/bin/bash\nSESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null)||exit 0\nWINDOW=$(tmux display-message -p '#{window_name}' 2>/dev/null)||exit 0\nPANE=$(tmux display-message -p '#{pane_index}' 2>/dev/null)||exit 0\n[ -z '$SESSION' ]&&exit 0\nexec tlink notify --session '$SESSION' --window '$WINDOW' --pane '$PANE'","claude"));
 }
-
-// ── Graceful exit without tmux ────────────────────────────────────────────────
 
 fn run_bash(s: &str) -> (String, String, bool) {
     let mut c = Command::new("bash")
@@ -260,38 +211,36 @@ fn run_bash(s: &str) -> (String, String, bool) {
 
 #[test]
 fn test_codex_graceful_no_tmux() {
-    let s = format!(
-        "tmux() {{ exit 1; }}; export -f tmux; {}",
-        codex_script("osascript")
-    );
-    let (_, stderr, ok) = run_bash(&s);
-    assert!(ok, "codex hook should exit 0 without tmux: stderr={stderr}");
+    // Strip shebang line — we're wrapping in a context that redefines tmux
+    let body = codex_script("osascript")
+        .lines()
+        .skip(1)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let s = format!("tmux() {{ exit 1; }}; export -f tmux; {body}");
+    let (_, e, ok) = run_bash(&s);
+    assert!(ok, "codex hook should exit 0 without tmux: stderr={e}");
 }
-
 #[test]
 fn test_gemini_graceful_no_tmux() {
-    let s = format!(
-        "tmux() {{ exit 1; }}; export -f tmux; echo '' | {}",
-        gemini_script("osascript")
-    );
-    let (_, stderr, ok) = run_bash(&s);
-    assert!(
-        ok,
-        "gemini hook should exit 0 without tmux: stderr={stderr}"
-    );
+    let body = gemini_script("osascript")
+        .lines()
+        .skip(1)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let s = format!("tmux() {{ exit 1; }}; export -f tmux; echo '' | {body}");
+    let (_, e, ok) = run_bash(&s);
+    assert!(ok, "gemini hook should exit 0 without tmux: stderr={e}");
 }
 
-// ── Real tmux tests ───────────────────────────────────────────────────────────
-
-fn tmux_fmt(fmt: &str) -> String {
-    let out = Command::new("tmux")
-        .args(["display-message", "-p", fmt])
+fn tmux_fmt(f: &str) -> String {
+    let o = Command::new("tmux")
+        .args(["display-message", "-p", f])
         .output()
         .unwrap();
-    assert!(out.status.success());
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
+    assert!(o.status.success());
+    String::from_utf8_lossy(&o.stdout).trim().to_string()
 }
-
 #[test]
 fn test_tmux_session() {
     assert!(!tmux_fmt("#{session_name}").is_empty());
@@ -307,47 +256,42 @@ fn test_tmux_pane() {
 
 #[test]
 fn test_tlink_open() {
-    let session = tmux_fmt("#{session_name}");
-    let out = tlink_cmd(&["open", &format!("tmux://{session}")])
+    let s = tmux_fmt("#{session_name}");
+    let o = tlink_cmd(&["open", &format!("tmux://{s}")])
         .output()
         .unwrap();
-    assert!(out.status.success());
+    assert!(o.status.success());
 }
 
 #[test]
 fn test_hook_pipe() {
-    let payload = r#"{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Hook test"}"#;
-    let tlink = std::env::var("TLINK_BIN").unwrap_or_else(|_| "target/debug/tlink".to_string());
-    let cmd = format!(
-        "printf '%s' '{payload}' | '{}' notify --session s --window 1 --pane 0",
-        tlink
+    let p = r#"{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Hook test"}"#;
+    let b = std::env::var("TLINK_BIN").unwrap_or_else(|_| "target/debug/tlink".into());
+    let c = format!(
+        "printf '%s' '{p}' | '{}' notify --session s --window 1 --pane 0",
+        b
     );
-    let out = Command::new("bash").args(["-c", &cmd]).output().unwrap();
+    let o = Command::new("bash").args(["-c", &c]).output().unwrap();
     assert!(
-        out.status.success(),
-        "pipe should work: stderr={}",
-        String::from_utf8_lossy(&out.stderr)
+        o.status.success(),
+        "pipe failed: {}",
+        String::from_utf8_lossy(&o.stderr)
     );
 }
-
-// ── Config ────────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_config_roundtrip() {
-    let tmp = std::env::temp_dir().join(format!("tlink-cfg-{}.toml", std::process::id()));
-    std::fs::write(&tmp, "notification_method = \"terminal-notifier\"\n").unwrap();
-    assert!(std::fs::read_to_string(&tmp)
+    let t = std::env::temp_dir().join(format!("tlink-cfg-{}.toml", std::process::id()));
+    std::fs::write(&t, "notification_method = \"terminal-notifier\"\n").unwrap();
+    assert!(std::fs::read_to_string(&t)
         .unwrap()
         .contains("terminal-notifier"));
-    std::fs::remove_file(&tmp).ok();
+    std::fs::remove_file(&t).ok();
 }
-
-// ── Python3 parser ────────────────────────────────────────────────────────────
 
 #[test]
 fn test_gemini_python_parser() {
-    let mut c = Command::new("python3").args(["-c", r#"import sys, json, shlex; d=json.loads(sys.stdin.read()); print('MESSAGE=' + shlex.quote(d.get('message','')))"#])
-        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+    let mut c=Command::new("python3").args(["-c",r#"import sys,json,shlex; d=json.loads(sys.stdin.read()); print('MESSAGE='+shlex.quote(d.get('message','')))"#]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
     c.stdin
         .take()
         .unwrap()
@@ -357,7 +301,6 @@ fn test_gemini_python_parser() {
     assert!(o.status.success());
     assert!(String::from_utf8_lossy(&o.stdout).contains("Gemini task done"));
 }
-
 #[test]
 fn test_gemini_python_parser_empty() {
     let mut c = Command::new("python3")

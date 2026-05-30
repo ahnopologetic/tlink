@@ -8,14 +8,27 @@ mod open;
 mod restart;
 mod setup;
 mod status;
+mod telemetry;
 mod terminal;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Commands, ListTarget};
+use cli::{Cli, Commands, ListTarget, TelemetryAction};
 
 fn main() {
-    if let Err(e) = run() {
+    telemetry::init();
+    let result = run();
+    // Record event _before_ shutdown so Sentry can flush it
+    if let Err(ref e) = result {
+        telemetry::record_event(
+            "command.fail",
+            Some(serde_json::json!({
+                "error": format!("{e:#}"),
+            })),
+        );
+    }
+    telemetry::shutdown();
+    if let Err(e) = result {
         eprintln!("error: {e:#}");
         std::process::exit(1);
     }
@@ -23,9 +36,23 @@ fn main() {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
-    match cli.command {
+    let cmd_name = format!("{:?}", cli.command)
+        .split(&[' ', '('][..])
+        .next()
+        .unwrap_or("unknown")
+        .to_lowercase();
+    {
+        let props = serde_json::json!({
+            "command": cmd_name,
+        });
+        telemetry::record_event("command.run", Some(props));
+    }
+    let result = match &cli.command {
         Commands::Setup => setup::run(),
-        Commands::Open { uri } => open::run(&uri),
+        Commands::Open { .. } => open::run(match &cli.command {
+            Commands::Open { uri } => uri,
+            _ => unreachable!(),
+        }),
         Commands::Status => status::run(),
         Commands::Restart => restart::run(),
         Commands::Doctor => doctor::run(),
@@ -33,27 +60,37 @@ fn run() -> Result<()> {
             interactive: true, ..
         } => addon::install_interactive(),
         Commands::Install {
-            addon: Some(name),
-            interactive: false,
-        } => addon::install(&name),
-        Commands::Install {
-            addon: None,
-            interactive: false,
-        } => {
+            addon: Some(name), ..
+        } => addon::install(name),
+        Commands::Install { addon: None, .. } => {
             eprintln!("Usage: tlink install <addon-name>");
             eprintln!("       tlink install --interactive");
             eprintln!("Run `tlink list add-ons` to see available add-ons.");
             Ok(())
         }
-        Commands::Delete { addon } => addon::delete(&addon),
+        Commands::Delete { addon } => addon::delete(addon),
         Commands::List {
             target: ListTarget::Addons,
         } => addon::list(),
+        Commands::Telemetry { action } => match action {
+            TelemetryAction::Enable { dsn } => telemetry::enable(dsn.clone()),
+            TelemetryAction::Disable => telemetry::disable(),
+            TelemetryAction::Status => telemetry::status(),
+        },
         Commands::Notify {
             session,
             window,
             pane,
             term,
-        } => notify::run(&session, &window, &pane, &term),
+        } => notify::run(session, window, pane, term),
+    };
+    if result.is_ok() {
+        telemetry::record_event(
+            "command.ok",
+            Some(serde_json::json!({
+                "command": cmd_name,
+            })),
+        );
     }
+    result
 }

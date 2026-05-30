@@ -7,7 +7,7 @@ pub struct Cli {
     pub command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Interactive TUI wizard: select terminal, register tmux:// URI scheme
     Setup,
@@ -41,6 +41,11 @@ pub enum Commands {
         #[command(subcommand)]
         target: ListTarget,
     },
+    /// Manage telemetry preferences
+    Telemetry {
+        #[command(subcommand)]
+        action: TelemetryAction,
+    },
     /// Fire a desktop notification from a Claude Code hook (reads JSON from stdin)
     #[command(hide = true)]
     Notify {
@@ -56,7 +61,21 @@ pub enum Commands {
     },
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
+pub enum TelemetryAction {
+    /// Enable telemetry (anonymous usage data + optional error tracking)
+    Enable {
+        /// Sentry DSN for error tracking (optional)
+        #[arg(long, env = "TLINK_SENTRY_DSN")]
+        dsn: Option<String>,
+    },
+    /// Disable telemetry
+    Disable,
+    /// Show current telemetry status
+    Status,
+}
+
+#[derive(Debug, Subcommand)]
 pub enum ListTarget {
     /// Show all add-ons and their status
     #[command(name = "add-ons")]

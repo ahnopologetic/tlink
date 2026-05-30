@@ -8,6 +8,10 @@ pub struct Config {
     /// Notification method chosen during `tlink install claude-notification`
     /// Values: "terminal-notifier" | "osascript" | "dunstify" | "notify-send"
     pub notification_method: Option<String>,
+    /// Telemetry opt-in. `true` = enabled, `false` = disabled, `None` = undecided.
+    pub telemetry_enabled: Option<bool>,
+    /// Sentry DSN for error tracking (optional, set via TLINK_SENTRY_DSN or config).
+    pub sentry_dsn: Option<String>,
 }
 
 pub fn config_path() -> PathBuf {

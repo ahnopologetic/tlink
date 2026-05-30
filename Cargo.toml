@@ -8,7 +8,7 @@ license = "MIT"
 keywords = ["tmux", "deeplink", "cli", "macos"]
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 ratatui = "0.29"
 crossterm = "0.28"
 serde = { version = "1", features = ["derive"] }
@@ -16,3 +16,6 @@ toml = "0.8"
 dirs = "5"
 anyhow = "1"
 serde_json = "1"
+sentry = "0.36"
+sentry-anyhow = "0.36"
+uuid = { version = "1", features = ["v4"] }

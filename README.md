@@ -11,7 +11,7 @@
 open tmux://work/editor/0
 ```
 
-`tlink` registers the `tmux://` URI scheme and routes clicks to the exact pane — flashing the border and showing a status-bar toast on arrival. It also ships a [Claude Code notification addon](docs/claude-notification.md) that pings you when Claude finishes a task.
+`tlink` registers the `tmux://` URI scheme and routes clicks to the exact pane — flashing the border and showing a status-bar toast on arrival. It also ships notification addons that ping you when an AI coding agent finishes a task.
 
 ## Install
 
@@ -51,6 +51,7 @@ open tmux://mysession/editor/1
 | `tlink setup` | Register the `tmux://` URI scheme (macOS) |
 | `tlink open <uri>` | Navigate to a tmux pane |
 | `tlink install claude-notification` | Install the Claude Code notification addon |
+| `tlink install codex-notification` | Install the Codex CLI notification addon |
 | `tlink status` | Show registration state and active sessions |
 | `tlink doctor` | Run diagnostic checks |
 | `tlink restart` | Re-register the URI handler |
@@ -67,6 +68,16 @@ tlink install claude-notification
 
 → [Full docs](docs/claude-notification.md)
 
+### codex-notification
+
+Desktop notifications from Codex CLI hooks.
+
+```bash
+tlink install codex-notification
+```
+
+→ [Full docs](docs/codex-notification.md)
+
 ## Platform support
 
 | Feature | macOS | Linux |
@@ -74,7 +85,8 @@ tlink install claude-notification
 | `tmux://` URI scheme | ✓ | — |
 | Pane navigation (`tlink open`) | ✓ | ✓ |
 | Status-bar toast | ✓ | ✓ |
-| claude-notification addon | ✓ (alerter) | ✓ (dunstify / notify-send) |
+| claude-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
+| codex-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
 
 ## License
 

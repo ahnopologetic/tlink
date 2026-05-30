@@ -1,70 +1,18 @@
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-/// Path to the pre-built tlink binary.
-/// Prefer the binary compiled by `cargo build` (avoids lock conflicts with `cargo test`).
-fn tlink_binary() -> PathBuf {
-    eprintln!("[dbg] CWD={:?}", std::env::current_dir());
-    if let Ok(m) = std::env::var("CARGO_MANIFEST_DIR") {
-        let c = PathBuf::from(&m).join("target/debug/tlink");
-        eprintln!(
-            "[dbg] manifest={}, candidate={}, exists={}",
-            m,
-            c.display(),
-            c.exists()
-        );
-        if c.exists() {
-            return c;
-        }
-    }
-    let c = PathBuf::from("target/debug/tlink");
-    eprintln!("[dbg] relative={}, exists={}", c.display(), c.exists());
-    if c.exists() {
-        return c;
-    }
-    if let Some(exe) = std::env::current_exe().ok() {
-        if let Some(p) = exe
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|p| p.join("tlink"))
-        {
-            eprintln!(
-                "[dbg] exe={}, parent_tlink={}, exists={}",
-                exe.display(),
-                p.display(),
-                p.exists()
-            );
-            if p.exists() {
-                return p;
-            }
-        }
-    }
-    eprintln!("[dbg] falling back to 'cargo'");
-    PathBuf::from("cargo")
-}
-
-fn is_cargo_bin() -> bool {
-    tlink_binary().to_string_lossy() == "cargo"
-}
-
-/// Build the appropriate Command for running the tlink binary.
+/// Build a Command that will run the tlink binary.
+/// Uses `cargo run --offline` to avoid lock conflicts with `cargo test`.
 fn tlink_cmd(args: &[&str]) -> Command {
-    let tlink = tlink_binary();
-    if is_cargo_bin() {
-        let mut c = Command::new("cargo");
-        c.arg("run").arg("--");
-        c.args(args);
-        c
-    } else {
-        let mut c = Command::new(&tlink);
-        c.args(args);
-        c
-    }
+    let mut c = Command::new("cargo");
+    c.arg("run").arg("--offline").arg("--");
+    c.args(args);
+    c
 }
 
 /// Helper: write bash script to temp file and run `bash -n`.
 fn check_bash_syntax(script: &str, label: &str) -> bool {
+    use std::path::PathBuf;
     let pid = std::process::id();
     let tid = std::thread::current().id();
     let tmp = std::env::temp_dir().join(format!("tlink-syntax-{}-{:?}-{}.sh", pid, tid, label));
@@ -166,7 +114,10 @@ exec tlink notify --session '$SESSION' --window '$WINDOW' --pane '$PANE'";
 
 #[test]
 fn test_tlink_help() {
-    assert!(tlink_cmd(&["--help"]).output().unwrap().status.success());
+    let out = tlink_cmd(&["--help"]).output().unwrap();
+    assert!(out.status.success());
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(s.contains("tlink"));
 }
 
 #[test]
@@ -401,14 +352,9 @@ fn test_tlink_open() {
 #[test]
 fn test_hook_pipe() {
     let payload = r#"{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Hook test"}"#;
-    let binary = if is_cargo_bin() {
-        "cargo run --".to_string()
-    } else {
-        tlink_binary().to_string_lossy().to_string()
-    };
     let cmd = format!(
-        "printf '%s' '{}' | {} notify --session s --window 1 --pane 0",
-        payload, binary
+        "printf '%s' '{}' | cargo run --offline -- notify --session s --window 1 --pane 0",
+        payload
     );
     let out = Command::new("bash").args(["-c", &cmd]).output().unwrap();
     assert!(
@@ -438,24 +384,31 @@ fn test_gemini_python_parser() {
     let payload = r#"{"hook_event_name":"AfterAgent","notification_type":"idle_prompt","message":"Gemini task done"}"#;
     let mut child = Command::new("python3")
         .args(["-c", r#"import sys, json, shlex; d=json.loads(sys.stdin.read()); msg=d.get('message',''); print('MESSAGE=' + shlex.quote(msg))"#])
-        .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
-        .spawn().unwrap();
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
     {
         let mut h = child.stdin.take().unwrap();
         h.write_all(payload.as_bytes()).unwrap();
     }
     let out = child.wait_with_output().unwrap();
     assert!(out.status.success());
-    assert!(String::from_utf8_lossy(&out.stdout).contains("MESSAGE="));
-    assert!(String::from_utf8_lossy(&out.stdout).contains("Gemini task done"));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("MESSAGE="));
+    assert!(stdout.contains("Gemini task done"));
 }
 
 #[test]
 fn test_gemini_python_parser_empty() {
     let mut child = Command::new("python3")
         .args(["-c", r#"import sys, json; d=json.loads(sys.stdin.read()) if sys.stdin.read().strip() else {}; print('ok')"#])
-        .stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null())
-        .spawn().unwrap();
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
     child.stdin.take();
     let out = child.wait_with_output().unwrap();
     assert!(out.status.success());

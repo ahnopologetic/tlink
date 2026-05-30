@@ -1,4 +1,5 @@
 pub mod claude_notification;
+pub mod pi_notification;
 
 use anyhow::{bail, Result};
 
@@ -9,16 +10,24 @@ pub struct AddonInfo {
 }
 
 fn registry() -> Vec<AddonInfo> {
-    vec![AddonInfo {
-        name: "claude-notification",
-        description: "Native desktop notification when Claude calls; click to navigate back to that tmux pane",
-        installed: claude_notification::is_installed(),
-    }]
+    vec![
+        AddonInfo {
+            name: "claude-notification",
+            description: "Native desktop notification when Claude calls; click to navigate back to that tmux pane",
+            installed: claude_notification::is_installed(),
+        },
+        AddonInfo {
+            name: "pi-notification",
+            description: "Native desktop notification when Pi agent events fire; click to navigate back to that tmux pane",
+            installed: pi_notification::is_installed(),
+        },
+    ]
 }
 
 pub fn install(name: &str) -> Result<()> {
     match name {
         "claude-notification" => claude_notification::install(),
+        "pi-notification" => pi_notification::install(),
         _ => bail!("unknown add-on '{name}'. Run `tlink list add-ons` to see available add-ons."),
     }
 }
@@ -26,6 +35,7 @@ pub fn install(name: &str) -> Result<()> {
 pub fn delete(name: &str) -> Result<()> {
     match name {
         "claude-notification" => claude_notification::uninstall(),
+        "pi-notification" => pi_notification::uninstall(),
         _ => bail!("unknown add-on '{name}'."),
     }
 }

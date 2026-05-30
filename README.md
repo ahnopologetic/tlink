@@ -51,6 +51,7 @@ open tmux://mysession/editor/1
 | `tlink setup` | Register the `tmux://` URI scheme (macOS) |
 | `tlink open <uri>` | Navigate to a tmux pane |
 | `tlink install claude-notification` | Install the Claude Code notification addon |
+| `tlink install codex-notification` | Install the Codex CLI notification addon |
 | `tlink install gemini-notification` | Install the Gemini CLI notification addon |
 | `tlink status` | Show registration state and active sessions |
 | `tlink doctor` | Run diagnostic checks |
@@ -67,6 +68,16 @@ tlink install claude-notification
 ```
 
 → [Full docs](docs/claude-notification.md)
+
+### codex-notification
+
+Desktop notifications from Codex CLI hooks.
+
+```bash
+tlink install codex-notification
+```
+
+→ [Full docs](docs/codex-notification.md)
 
 ### gemini-notification
 
@@ -86,6 +97,7 @@ tlink install gemini-notification
 | Pane navigation (`tlink open`) | ✓ | ✓ |
 | Status-bar toast | ✓ | ✓ |
 | claude-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
+| codex-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
 | gemini-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
 
 ## License

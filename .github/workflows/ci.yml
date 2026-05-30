@@ -31,8 +31,13 @@ jobs:
 
       - name: Start tmux session for integration tests
         run: |
+          # Create a detached session for display-message tests
           tmux new-session -d -s ci-test 2>/dev/null || true
           tmux rename-window -t ci-test:0 test-window 2>/dev/null || true
+          # Create an attached session in the background for switch-client tests
+          tmux new-session -d -s ci-attached 2>/dev/null || true
+          tmux attach-session -t ci-attached &
+          sleep 0.5
 
       # Build the main binary and copy it to a safe location.
       # Copying avoids test-harness transformation when cargo test re-links it.

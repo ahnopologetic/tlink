@@ -160,6 +160,19 @@ fn execute_switch(
     };
     log!("execute_switch: tmux_target={tmux_target}");
 
+    // Ghostty: always open a new tab via .command file rather than using
+    // switch-client (which silently moves sessions in invisible tabs).
+    // For all other terminals: try switch-client first, fall back to attach_tmux.
+    let is_ghostty = adapter.map(|a| a.name == "Ghostty").unwrap_or(false);
+
+    if is_ghostty {
+        log!("execute_switch: Ghostty — opening new tab via attach_tmux");
+        if let Some(a) = adapter {
+            let _ = a.attach_tmux(&tmux_target);
+        }
+        return Ok(());
+    }
+
     // switch-client works when any tmux client is attached (even if the terminal
     // was backgrounded). If it fails the session is truly detached — fall back to
     // asking the terminal to run attach-session in a new window.

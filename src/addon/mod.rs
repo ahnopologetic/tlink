@@ -1,6 +1,7 @@
 pub mod claude_notification;
 pub mod codex_notification;
 pub mod gemini_notification;
+mod interactive;
 pub mod pi_notification;
 
 use anyhow::{bail, Result};
@@ -11,7 +12,7 @@ pub struct AddonInfo {
     pub installed: bool,
 }
 
-fn registry() -> Vec<AddonInfo> {
+pub(crate) fn registry() -> Vec<AddonInfo> {
     vec![
         AddonInfo {
             name: "claude-notification",
@@ -69,4 +70,9 @@ pub fn list() -> Result<()> {
         println!("{:<25} {:<15} {}", a.name, status, a.description);
     }
     Ok(())
+}
+
+/// Interactive add-on selector using ratatui.
+pub fn install_interactive() -> Result<()> {
+    interactive::run()
 }

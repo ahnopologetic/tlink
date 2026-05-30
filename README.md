@@ -54,11 +54,20 @@ open tmux://mysession/editor/1
 | `tlink install codex-notification` | Install the Codex CLI notification addon |
 | `tlink install gemini-notification` | Install the Gemini CLI notification addon |
 | `tlink install pi-notification` | Install the Pi agent notification addon |
+| `tlink install --interactive` | Interactive add-on selector (multi-select) |
 | `tlink status` | Show registration state and active sessions |
 | `tlink doctor` | Run diagnostic checks |
 | `tlink restart` | Re-register the URI handler |
 
 ## Addons
+
+### Interactive install
+
+Use `tlink install -i` or `tlink install --interactive` to open a TUI that lists all available add-ons with checkboxes. Select multiple add-ons and install them all at once.
+
+```bash
+tlink install -i
+```
 
 ### claude-notification
 

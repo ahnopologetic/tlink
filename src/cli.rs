@@ -25,7 +25,11 @@ pub enum Commands {
     /// Install a tlink add-on
     Install {
         /// Add-on name (e.g. claude-notification)
-        addon: String,
+        addon: Option<String>,
+
+        /// Interactively select add-ons to install
+        #[arg(short = 'i', long = "interactive", conflicts_with = "addon")]
+        interactive: bool,
     },
     /// Remove a tlink add-on
     Delete {

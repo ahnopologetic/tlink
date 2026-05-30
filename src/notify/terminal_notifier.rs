@@ -30,6 +30,9 @@ impl NotificationAdapter for TerminalNotifierAdapter {
         let args = self.build_args(req);
         std::process::Command::new("terminal-notifier")
             .args(&args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()?;
         Ok(())
     }
@@ -45,8 +48,6 @@ mod tests {
             message: "Msg".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
-            notification_type: "idle_prompt".into(),
-            choices: vec![],
         }
     }
 

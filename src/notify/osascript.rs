@@ -31,14 +31,6 @@ impl NotificationAdapter for OsascriptAdapter {
     }
 }
 
-pub fn alerter_available() -> bool {
-    std::process::Command::new("which")
-        .arg("alerter")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,8 +41,6 @@ mod tests {
             message: "Msg".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
-            notification_type: "idle_prompt".into(),
-            choices: vec![],
         }
     }
 
@@ -81,8 +71,6 @@ mod tests {
             message: r"foo\bar".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
-            notification_type: "idle_prompt".into(),
-            choices: vec![],
         };
         let s = OsascriptAdapter.build_script(&r);
         assert!(s.contains(r#"\"hi\""#));
@@ -92,11 +80,5 @@ mod tests {
     #[test]
     fn name_returns_osascript() {
         assert_eq!(OsascriptAdapter.name(), "osascript");
-    }
-
-    #[test]
-    fn alerter_available_returns_bool() {
-        // Just verify it doesn't panic; result depends on the environment.
-        let _ = alerter_available();
     }
 }

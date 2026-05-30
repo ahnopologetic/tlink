@@ -680,14 +680,7 @@ fn render(f: &mut ratatui::Frame, state: &State) {
             ];
             if *method == NotifMethod::Osascript || *method == NotifMethod::NotifySend {
                 lines.push(Line::from(Span::styled(
-                    "  Tip: install alerter (macOS 12+) or dunst (Linux) for click-to-navigate",
-                    Style::default().fg(Color::Yellow),
-                )));
-                lines.push(Line::from(""));
-            }
-            if *method == NotifMethod::TerminalNotifier {
-                lines.push(Line::from(Span::styled(
-                    "  Note: terminal-notifier click actions are broken on macOS 12+; consider alerter",
+                    "  Tip: install terminal-notifier (macOS) or dunst (Linux) for banner notifications",
                     Style::default().fg(Color::Yellow),
                 )));
                 lines.push(Line::from(""));
@@ -718,11 +711,7 @@ mod tests {
 
     fn method_state() -> State {
         State::SelectMethod {
-            methods: vec![
-                NotifMethod::Alerter,
-                NotifMethod::TerminalNotifier,
-                NotifMethod::Osascript,
-            ],
+            methods: vec![NotifMethod::TerminalNotifier, NotifMethod::Osascript],
             cursor: 0,
         }
     }

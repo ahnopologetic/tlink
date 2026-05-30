@@ -26,6 +26,9 @@ impl NotificationAdapter for DunstifyAdapter {
         let cmd = self.build_script(req);
         std::process::Command::new("sh")
             .args(["-c", &cmd])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()?;
         Ok(())
     }
@@ -41,8 +44,6 @@ mod tests {
             message: "Done".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
-            notification_type: "idle_prompt".into(),
-            choices: vec![],
         }
     }
 

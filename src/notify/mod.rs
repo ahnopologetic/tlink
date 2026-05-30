@@ -1,5 +1,4 @@
 mod adapter;
-mod alerter;
 mod dunstify;
 mod notify_send;
 mod osascript;
@@ -127,29 +126,13 @@ fn resolve(payload: &Payload) -> (String, String, Vec<String>) {
     }
 }
 
-/// Returns the adapter for the given method name.
-/// Exposed for testing with an injectable `alerter_available` flag.
-pub fn make_adapter_with_fallback(
-    method: &str,
-    alerter_available: bool,
-) -> Box<dyn NotificationAdapter> {
+pub fn make_adapter(method: &str) -> Box<dyn NotificationAdapter> {
     match method {
-        "alerter" => Box::new(alerter::AlerterAdapter),
         "terminal-notifier" => Box::new(terminal_notifier::TerminalNotifierAdapter),
         "dunstify" => Box::new(dunstify::DunstifyAdapter),
         "notify-send" => Box::new(notify_send::NotifySendAdapter),
-        _ => {
-            if alerter_available {
-                Box::new(alerter::AlerterAdapter)
-            } else {
-                Box::new(osascript::OsascriptAdapter)
-            }
-        }
+        _ => Box::new(osascript::OsascriptAdapter),
     }
-}
-
-pub fn make_adapter(method: &str) -> Box<dyn NotificationAdapter> {
-    make_adapter_with_fallback(method, osascript::alerter_available())
 }
 
 pub fn run(session: &str, window: &str, pane: &str) -> Result<()> {
@@ -157,12 +140,7 @@ pub fn run(session: &str, window: &str, pane: &str) -> Result<()> {
     std::io::stdin().read_to_string(&mut stdin)?;
 
     let payload: Payload = serde_json::from_str(&stdin).unwrap_or_default();
-    let (title, message, choices) = resolve(&payload);
-    let notification_type = payload
-        .notification_type
-        .as_deref()
-        .unwrap_or("")
-        .to_string();
+    let (title, message, _choices) = resolve(&payload);
 
     let deeplink = format!("tmux://{}/{}/{}", session, window, pane);
     let location = format!("{} > {} > {}", session, window, pane);
@@ -175,8 +153,6 @@ pub fn run(session: &str, window: &str, pane: &str) -> Result<()> {
         message,
         location,
         deeplink,
-        notification_type,
-        choices,
     };
 
     make_adapter(method).notify(&req)
@@ -464,69 +440,33 @@ mod tests {
         assert_eq!(title, "Waiting for your input");
     }
 
-    // ── make_adapter_with_fallback ─────────────────────────────────────────────
-
-    #[test]
-    fn factory_alerter_method() {
-        assert_eq!(
-            make_adapter_with_fallback("alerter", false).name(),
-            "alerter"
-        );
-    }
+    // ── make_adapter ──────────────────────────────────────────────────────────
 
     #[test]
     fn factory_terminal_notifier_method() {
         assert_eq!(
-            make_adapter_with_fallback("terminal-notifier", false).name(),
+            make_adapter("terminal-notifier").name(),
             "terminal-notifier"
         );
     }
 
     #[test]
     fn factory_dunstify_method() {
-        assert_eq!(
-            make_adapter_with_fallback("dunstify", false).name(),
-            "dunstify"
-        );
+        assert_eq!(make_adapter("dunstify").name(), "dunstify");
     }
 
     #[test]
     fn factory_notify_send_method() {
-        assert_eq!(
-            make_adapter_with_fallback("notify-send", false).name(),
-            "notify-send"
-        );
+        assert_eq!(make_adapter("notify-send").name(), "notify-send");
     }
 
     #[test]
-    fn factory_osascript_fallback_when_alerter_unavailable() {
-        assert_eq!(
-            make_adapter_with_fallback("osascript", false).name(),
-            "osascript"
-        );
+    fn factory_osascript_method() {
+        assert_eq!(make_adapter("osascript").name(), "osascript");
     }
 
     #[test]
-    fn factory_osascript_prefers_alerter_when_available() {
-        assert_eq!(
-            make_adapter_with_fallback("osascript", true).name(),
-            "alerter"
-        );
-    }
-
-    #[test]
-    fn factory_unknown_method_falls_back_to_alerter_when_available() {
-        assert_eq!(
-            make_adapter_with_fallback("xdg-desktop-portal", true).name(),
-            "alerter"
-        );
-    }
-
-    #[test]
-    fn factory_unknown_method_falls_back_to_osascript_when_alerter_unavailable() {
-        assert_eq!(
-            make_adapter_with_fallback("xdg-desktop-portal", false).name(),
-            "osascript"
-        );
+    fn factory_unknown_method_falls_back_to_osascript() {
+        assert_eq!(make_adapter("xdg-desktop-portal").name(), "osascript");
     }
 }

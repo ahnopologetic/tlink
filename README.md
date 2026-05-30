@@ -15,24 +15,13 @@ open tmux://work/editor/0
 
 ## Install
 
-**macOS / Linux — binary**
-
 ```bash
-VERSION=v0.1.2
-# macOS
-ARCH=$(uname -m); [ "$ARCH" = "arm64" ] && ARCH="aarch64"
-curl -fsSL "https://github.com/ahnopologetic/tlink/releases/download/${VERSION}/tlink-${ARCH}-apple-darwin" \
-  -o /usr/local/bin/tlink && chmod +x /usr/local/bin/tlink
-
-# Linux (x86_64, glibc)
-curl -fsSL "https://github.com/ahnopologetic/tlink/releases/download/${VERSION}/tlink-x86_64-unknown-linux-gnu" \
-  -o /usr/local/bin/tlink && chmod +x /usr/local/bin/tlink
+curl -fsSL https://raw.githubusercontent.com/ahnopologetic/tlink/main/install.sh | sh
 ```
 
-See [Releases](https://github.com/ahnopologetic/tlink/releases/latest) for all targets (ARM64, musl, ARMv7).
+Detects your OS and architecture, installs to `~/.local/bin`, and adds it to your PATH. No sudo required.
 
 **From source**
-
 ```bash
 cargo install --git https://github.com/ahnopologetic/tlink
 ```

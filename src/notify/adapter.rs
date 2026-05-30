@@ -5,8 +5,6 @@ pub struct NotificationRequest {
     pub message: String,
     pub location: String,
     pub deeplink: String,
-    pub notification_type: String,
-    pub choices: Vec<String>,
 }
 
 pub trait NotificationAdapter: Send + Sync {

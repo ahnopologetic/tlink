@@ -7,27 +7,15 @@ use std::path::PathBuf;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum NotifMethod {
-    Alerter,          // macOS 12+ — UNUserNotificationCenter, real click-to-navigate
-    TerminalNotifier, // macOS — click actions broken on macOS 12+
+    TerminalNotifier, // macOS — banner notifications
     Osascript,        // macOS — built-in fallback, no click callback
     Dunstify,         // Linux — click-to-navigate via action
     NotifySend,       // Linux — basic
 }
 
-fn macos_major_version() -> u32 {
-    std::process::Command::new("sw_vers")
-        .args(["-productVersion"])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .and_then(|s| s.trim().split('.').next().and_then(|v| v.parse().ok()))
-        .unwrap_or(0)
-}
-
 impl NotifMethod {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
             Self::Osascript => "osascript (built-in)",
             Self::Dunstify => "dunstify",
@@ -37,22 +25,19 @@ impl NotifMethod {
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::Alerter =>
-                "Click to jump to pane — UNUserNotificationCenter (macOS 12+). Install: brew tap vjeantet/tap && brew install alerter",
-            Self::TerminalNotifier =>
-                "Click actions broken on macOS 12+ (shows notification only). Install: brew install terminal-notifier",
-            Self::Osascript =>
-                "Built-in macOS. No click callback — navigates immediately when notification fires",
-            Self::Dunstify =>
-                "Click notification to jump back — requires: dunst daemon",
-            Self::NotifySend =>
-                "Desktop notification, no click action — requires: libnotify",
+            Self::TerminalNotifier => {
+                "macOS banner notifications. Install: brew install terminal-notifier"
+            }
+            Self::Osascript => {
+                "Built-in macOS. No click callback — navigates immediately when notification fires"
+            }
+            Self::Dunstify => "Click notification to jump back — requires: dunst daemon",
+            Self::NotifySend => "Desktop notification, no click action — requires: libnotify",
         }
     }
 
     pub fn available(&self) -> bool {
         let cmd = match self {
-            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
             Self::Osascript => "osascript",
             Self::Dunstify => "dunstify",
@@ -67,7 +52,6 @@ impl NotifMethod {
 
     pub fn config_key(&self) -> &'static str {
         match self {
-            Self::Alerter => "alerter",
             Self::TerminalNotifier => "terminal-notifier",
             Self::Osascript => "osascript",
             Self::Dunstify => "dunstify",
@@ -78,7 +62,6 @@ impl NotifMethod {
     #[allow(dead_code)]
     pub fn from_config_key(key: &str) -> Option<Self> {
         match key {
-            "alerter" => Some(Self::Alerter),
             "terminal-notifier" => Some(Self::TerminalNotifier),
             "osascript" => Some(Self::Osascript),
             "dunstify" => Some(Self::Dunstify),
@@ -90,12 +73,7 @@ impl NotifMethod {
     /// Ordered list of methods for the current platform, best-first.
     pub fn platform_methods() -> Vec<Self> {
         if cfg!(target_os = "macos") {
-            if macos_major_version() >= 12 {
-                // alerter is the only macOS 12+ tool with working click callbacks
-                vec![Self::Alerter, Self::TerminalNotifier, Self::Osascript]
-            } else {
-                vec![Self::TerminalNotifier, Self::Alerter, Self::Osascript]
-            }
+            vec![Self::TerminalNotifier, Self::Osascript]
         } else {
             vec![Self::Dunstify, Self::NotifySend]
         }
@@ -104,11 +82,7 @@ impl NotifMethod {
     /// The single best method for this platform and OS version.
     pub fn recommended_method() -> Self {
         if cfg!(target_os = "macos") {
-            if macos_major_version() >= 12 {
-                Self::Alerter
-            } else {
-                Self::TerminalNotifier
-            }
+            Self::TerminalNotifier
         } else {
             Self::Dunstify
         }
@@ -280,35 +254,16 @@ pub fn install() -> Result<()> {
             Ok(())
         }
         Some(opts) => {
-            // TUI has exited — terminal is back to normal, safe to run brew/gh.
-            if !opts.method.available() {
-                match opts.method {
-                    NotifMethod::Alerter => {
-                        println!("Installing alerter…");
-                        if !try_install_alerter() {
-                            eprintln!("warning: alerter installation failed.");
-                            eprintln!("  Install manually:");
-                            eprintln!(
-                                "    brew tap vjeantet/tap && brew install vjeantet/tap/alerter"
-                            );
-                            eprintln!(
-                                "  Or download from https://github.com/vjeantet/alerter/releases"
-                            );
-                            eprintln!("  Falling back to osascript.");
-                        }
-                    }
-                    NotifMethod::TerminalNotifier => {
-                        println!("Installing terminal-notifier via Homebrew…");
-                        let ok = std::process::Command::new("brew")
-                            .args(["install", "terminal-notifier"])
-                            .status()
-                            .map(|s| s.success())
-                            .unwrap_or(false);
-                        if !ok {
-                            eprintln!("warning: brew install terminal-notifier failed.");
-                        }
-                    }
-                    _ => {}
+            // TUI has exited — terminal is back to normal, safe to run brew.
+            if !opts.method.available() && opts.method == NotifMethod::TerminalNotifier {
+                println!("Installing terminal-notifier via Homebrew…");
+                let ok = std::process::Command::new("brew")
+                    .args(["install", "terminal-notifier"])
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false);
+                if !ok {
+                    eprintln!("warning: brew install terminal-notifier failed.");
                 }
             }
             install_with_options(&opts)?;
@@ -328,48 +283,6 @@ pub fn uninstall() -> Result<()> {
     deregister_hook()?;
     println!("claude-notification removed.");
     Ok(())
-}
-
-// ── Installation helpers ──────────────────────────────────────────────────────
-
-fn try_install_alerter() -> bool {
-    // Try Homebrew tap first (works when Xcode CLT is present).
-    let brew = std::process::Command::new("sh")
-        .args([
-            "-c",
-            "brew tap vjeantet/tap 2>/dev/null && brew install vjeantet/tap/alerter 2>/dev/null",
-        ])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if brew
-        && std::process::Command::new("which")
-            .arg("alerter")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-    {
-        return true;
-    }
-
-    // Fall back: download pre-built binary via gh CLI.
-    let dest = dirs::home_dir()
-        .map(|h| h.join(".local/bin"))
-        .unwrap_or_else(|| std::path::PathBuf::from("/usr/local/bin"));
-    let dest_bin = dest.join("alerter");
-    let _ = std::fs::create_dir_all(&dest);
-    let cmd = format!(
-        "gh release download v26.5 --repo vjeantet/alerter --pattern 'alerter-*.zip' \
-         --dir /tmp/alerter-dl 2>/dev/null && \
-         unzip -o /tmp/alerter-dl/alerter-*.zip -d /tmp/alerter-dl 2>/dev/null && \
-         cp /tmp/alerter-dl/alerter {dest} && chmod +x {dest}",
-        dest = dest_bin.display(),
-    );
-    std::process::Command::new("sh")
-        .args(["-c", &cmd])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
 }
 
 // ── Installation logic ────────────────────────────────────────────────────────
@@ -445,7 +358,7 @@ SESSION=$(tmux display-message -p "#{session_name}" 2>/dev/null) || exit 0
 WINDOW=$(tmux display-message -p "#{window_name}" 2>/dev/null) || exit 0
 PANE=$(tmux display-message -p "#{pane_index}" 2>/dev/null) || exit 0
 [ -z "$SESSION" ] && exit 0
-tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE" &
+exec tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE"
 "##
 }
 
@@ -454,8 +367,7 @@ pub fn generate_hook_script(method: &NotifMethod) -> String {
     // DEEPLINK is only passed to the click action (-execute / tlink open),
     // never shown as visible notification text.
     let notify_block = match method {
-        // alerter and tlink notify both handle the full flow via the Rust binary
-        NotifMethod::Alerter | NotifMethod::TerminalNotifier => {
+        NotifMethod::TerminalNotifier => {
             r##"    terminal-notifier \
         -title "$NOTIF_TITLE" \
         -subtitle "$LOCATION" \
@@ -614,7 +526,6 @@ mod tests {
     #[test]
     fn test_generate_script_captures_tmux_context() {
         for method in [
-            NotifMethod::Alerter,
             NotifMethod::TerminalNotifier,
             NotifMethod::Osascript,
             NotifMethod::Dunstify,

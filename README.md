@@ -121,6 +121,30 @@ tlink install pi-notification
 | gemini-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
 | pi-notification addon | ✓ (terminal-notifier) | ✓ (dunstify / notify-send) |
 
+## Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ahnopologetic/tlink/main/uninstall.sh | sh
+```
+
+Removes:
+
+| What | Location |
+|---|---|
+| Binary | `~/.local/bin/tlink` |
+| Config | `~/.config/tlink/` (includes hook scripts) |
+| Telemetry data | `~/.local/share/tlink/` (events, machine-id) |
+| URI handler | `~/Applications/TmuxLink.app` |
+| URI scheme registration | Unregistered via `lsregister` (macOS) |
+
+If you installed via `cargo install`, also run:
+
+```bash
+cargo uninstall tlink
+```
+
+To restore your PATH, remove `export PATH="$HOME/.local/bin:$PATH"` from your shell config (`.zshrc`, `.bashrc`, etc.).
+
 ## License
 
 MIT

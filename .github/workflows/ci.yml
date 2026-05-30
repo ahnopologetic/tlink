@@ -34,25 +34,26 @@ jobs:
           tmux new-session -d -s ci-test 2>/dev/null || true
           tmux rename-window -t ci-test:0 test-window 2>/dev/null || true
 
-      # Build the main binary separately (avoids test-harness transformation)
-      - name: Build main binary
+      # Check if the workspace has noexec (some CI runners mount with noexec,
+      # preventing binary execution)
+      - name: Check for noexec mount
+        run: |
+          echo "target/debug mount info:"
+          df -T target/debug 2>/dev/null || stat -f target/debug 2>/dev/null || mount | grep "$PWD" || echo "no mount info"
+          touch /tmp/test-exec && chmod +x /tmp/test-exec && /tmp/test-exec && echo "exec OK in /tmp" || echo "exec FAIL in /tmp"
+          touch target/debug/test-exec 2>/dev/null && chmod +x target/debug/test-exec 2>/dev/null && target/debug/test-exec 2>&1 && echo "exec OK in target" || echo "exec FAIL in target"
+
+      - name: Build binary
         run: cargo build --bin tlink
 
-      # Run unit tests (using cargo test, no subprocess spawning needed)
-      - name: Run unit tests
-        run: cargo test --bin tlink
-
-      # Build and run integration tests separately
-      # Note: must NOT combine build & test in one cargo invocation because
-      # tlink_cargo would become a test harness binary (Command::new fails)
-      - name: Build integration tests
-        run: cargo test --test integration --no-run
-
-      - name: Run integration tests
+      - name: Test binary execution
         run: |
-          INTEG_BIN=$(find target/debug/deps -name 'integration-*' -type f ! -name '*.d' | head -1)
-          echo "Integration test binary: $INTEG_BIN"
-          $INTEG_BIN --test-threads=4
+          ls -la target/debug/tlink
+          file target/debug/tlink
+          target/debug/tlink --version && echo "BINARY OK" || echo "BINARY EXEC FAILED"
+
+      - name: Run all tests
+        run: cargo test -- --test-threads=4
 
       - name: Clean up tmux
         if: always()

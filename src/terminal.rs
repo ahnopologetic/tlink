@@ -110,23 +110,25 @@ impl TerminalAdapter {
                     .status()?;
             }
             "Ghostty" => {
-                // Ghostty supports -e <command> on macOS via open -na.
-                // env -u TMUX prevents "sessions should be nested" error.
-                Command::new("open")
-                    .args([
-                        "-na",
-                        "/Applications/Ghostty.app",
-                        "--args",
-                        "-e",
-                        "env",
-                        "-u",
-                        "TMUX",
-                        "tmux",
-                        "attach-session",
-                        "-t",
-                        target,
-                    ])
-                    .status()?;
+                // Ghostty has no AppleScript API for scripting new windows/tabs.
+                // But it opens .command files as new tabs in the existing
+                // window (or a new window if Ghostty isn't running).
+                // env -u TMUX prevents tmux's "sessions should be nested" error.
+                let tmp = std::env::temp_dir()
+                    .join(format!("tlink-ghostty-{}.command", std::process::id()));
+                let script = format!(
+                    "#!/bin/sh\nenv -u TMUX tmux attach-session -t '{}'\nexec $SHELL\n",
+                    target
+                );
+                if std::fs::write(&tmp, &script).is_ok() {
+                    let _ = std::process::Command::new("chmod")
+                        .arg("+x")
+                        .arg(&tmp)
+                        .status();
+                    let _ = Command::new("open")
+                        .args(["-a", "/Applications/Ghostty.app", &tmp.to_string_lossy()])
+                        .status();
+                }
             }
             _ => {
                 // Unknown terminal: focus only

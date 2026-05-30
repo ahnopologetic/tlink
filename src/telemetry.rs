@@ -245,20 +245,25 @@ pub fn record_event(name: &str, properties: Option<serde_json::Value>) {
 
 /// Enable telemetry and store the choice in config.
 pub fn enable(dsn: Option<String>) -> Result<()> {
+    apply_enable(dsn)?;
+    println!("Telemetry enabled");
+    println!("  Events:    ~/.local/share/tlink/telemetry/events.jsonl (local)");
+    let dsn_configured = resolve_dsn().is_some();
+    if dsn_configured {
+        println!("  Errors:    sent to Sentry");
+    } else {
+        println!("  Errors:    not sent (set TLINK_SENTRY_DSN or run with --dsn)");
+    }
+    Ok(())
+}
+
+fn apply_enable(dsn: Option<String>) -> Result<()> {
     let mut cfg = crate::config::load().unwrap_or_default();
     cfg.telemetry_enabled = Some(true);
     if let Some(dsn) = dsn {
         cfg.sentry_dsn = Some(dsn);
     }
     crate::config::save(&cfg)?;
-    println!("Telemetry enabled.");
-    println!("Activity events are logged locally to ~/.local/share/tlink/telemetry/events.jsonl");
-    if cfg.sentry_dsn.is_some() {
-        println!("Error reports will be sent to Sentry.");
-    } else {
-        println!("No Sentry DSN configured — error tracking off. Set TLINK_SENTRY_DSN or add sentry_dsn to config.");
-    }
-    // If Sentry wasn't running yet, initialize now
     init();
     record_event("telemetry.enabled", None);
     Ok(())
@@ -269,7 +274,7 @@ pub fn disable() -> Result<()> {
     let mut cfg = crate::config::load().unwrap_or_default();
     cfg.telemetry_enabled = Some(false);
     crate::config::save(&cfg)?;
-    println!("Telemetry disabled.");
+    println!("Telemetry disabled");
     Ok(())
 }
 
@@ -278,44 +283,43 @@ pub fn status() -> Result<()> {
     let cfg = crate::config::load().unwrap_or_default();
     let env_override = std::env::var("TLINK_TELEMETRY").ok();
     let active = enabled();
+    let (event_count, file_size) = if event_file_path().exists() {
+        let count = std::fs::read_to_string(event_file_path())
+            .map(|s| s.lines().count())
+            .unwrap_or(0);
+        let size = std::fs::metadata(event_file_path())
+            .map(|m| m.len())
+            .unwrap_or(0);
+        (count, size)
+    } else {
+        (0, 0)
+    };
 
-    println!("Telemetry status:");
+    println!("Telemetry");
     println!(
-        "  Active:              {}",
-        if active { "yes" } else { "no" }
+        "  State:     {}",
+        if active { "active" } else { "inactive" }
     );
     println!(
-        "  Config setting:      {}",
+        "  Config:    {}",
         match cfg.telemetry_enabled {
             Some(true) => "enabled",
             Some(false) => "disabled",
             None => "not set (default: disabled)",
         }
     );
+    if let Some(v) = env_override {
+        println!("  Override:  TLINK_TELEMETRY={v}");
+    }
     println!(
-        "  Env override:        {}",
-        env_override.as_deref().unwrap_or("none"),
-    );
-    println!(
-        "  Sentry DSN:          {}",
+        "  Errors:    {}",
         match resolve_dsn() {
-            Some(_) => "configured",
-            None => "not configured",
+            Some(_) => "sent to Sentry",
+            None => "not sent (no DSN)",
         }
     );
-    println!("  Event file:          {}", event_file_path().display());
-    if event_file_path().exists() {
-        let line_count = std::fs::read_to_string(event_file_path())
-            .map(|s| s.lines().count())
-            .unwrap_or(0);
-        println!("  Events recorded:     {line_count}");
-        let size = std::fs::metadata(event_file_path())
-            .map(|m| m.len())
-            .unwrap_or(0);
-        println!("  File size:           {} bytes", size);
-    } else {
-        println!("  Events recorded:     0");
-    }
+    println!("  Events:    {event_count} recorded ({file_size} bytes)");
+    println!("  Location:  {}", event_file_path().display());
     Ok(())
 }
 
@@ -325,22 +329,38 @@ mod tests {
 
     #[test]
     fn test_telemetry_disabled_by_default() {
+        // Save current env, clear it, test, then restore.
+        // Run with --test-threads=1 to avoid races with other env-var tests.
+        let saved = std::env::var("TLINK_TELEMETRY").ok();
         std::env::remove_var("TLINK_TELEMETRY");
         assert!(!enabled());
+        if let Some(v) = saved {
+            std::env::set_var("TLINK_TELEMETRY", v);
+        }
     }
 
     #[test]
     fn test_telemetry_enabled_via_env() {
+        let saved = std::env::var("TLINK_TELEMETRY").ok();
         std::env::set_var("TLINK_TELEMETRY", "1");
         assert!(enabled());
-        std::env::remove_var("TLINK_TELEMETRY");
+        if let Some(v) = saved {
+            std::env::set_var("TLINK_TELEMETRY", v);
+        } else {
+            std::env::remove_var("TLINK_TELEMETRY");
+        }
     }
 
     #[test]
     fn test_telemetry_disabled_via_env() {
+        let saved = std::env::var("TLINK_TELEMETRY").ok();
         std::env::set_var("TLINK_TELEMETRY", "0");
         assert!(!enabled());
-        std::env::remove_var("TLINK_TELEMETRY");
+        if let Some(v) = saved {
+            std::env::set_var("TLINK_TELEMETRY", v);
+        } else {
+            std::env::remove_var("TLINK_TELEMETRY");
+        }
     }
 
     #[test]

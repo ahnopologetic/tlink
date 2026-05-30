@@ -176,10 +176,14 @@ fn event_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<O
                 // Apply telemetry choice before installing
                 match telemetry_opt_in {
                     Some(true) => {
-                        let _ = crate::telemetry::enable(None);
+                        let mut cfg = crate::config::load().unwrap_or_default();
+                        cfg.telemetry_enabled = Some(true);
+                        let _ = crate::config::save(&cfg);
                     }
                     Some(false) => {
-                        let _ = crate::telemetry::disable();
+                        let mut cfg = crate::config::load().unwrap_or_default();
+                        cfg.telemetry_enabled = Some(false);
+                        let _ = crate::config::save(&cfg);
                     }
                     None => {}
                 }
@@ -300,9 +304,7 @@ fn render(f: &mut ratatui::Frame, state: &WizardState) {
                         Style::default().add_modifier(Modifier::BOLD),
                     )),
                     Line::from(""),
-                    Line::from(
-                        "Share anonymous usage data to help improve tlink.",
-                    ),
+                    Line::from("Share anonymous usage data to help improve tlink."),
                     Line::from("No personal info collected. See tlink telemetry status."),
                     Line::from(""),
                     Line::from(Span::styled(

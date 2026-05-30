@@ -110,27 +110,23 @@ impl TerminalAdapter {
                     .status()?;
             }
             "Ghostty" => {
-                // Ghostty on macOS has no public CLI for opening new windows with a command.
-                // Use System Events keystroke simulation as the best available approach.
-                // This requires Accessibility permission in System Settings.
-                let script = format!(
-                    r#"tell application "Ghostty" to activate
-delay 0.3
-tell application "System Events"
-    tell process "Ghostty"
-        keystroke "n" using command down
-    end tell
-end tell
-delay 0.4
-tell application "System Events"
-    tell process "Ghostty"
-        keystroke "tmux attach-session -t {}"
-        keystroke return
-    end tell
-end tell"#,
-                    target
-                );
-                let _ = Command::new("osascript").args(["-e", &script]).status();
+                // Ghostty supports -e <command> on macOS via open -na.
+                // env -u TMUX prevents "sessions should be nested" error.
+                Command::new("open")
+                    .args([
+                        "-na",
+                        "/Applications/Ghostty.app",
+                        "--args",
+                        "-e",
+                        "env",
+                        "-u",
+                        "TMUX",
+                        "tmux",
+                        "attach-session",
+                        "-t",
+                        target,
+                    ])
+                    .status()?;
             }
             _ => {
                 // Unknown terminal: focus only

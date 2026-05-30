@@ -2,16 +2,41 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 /// Build a Command for running the tlink binary.
-/// Prefers the prebuilt binary; falls back to `cargo run`.
+/// Uses TLINK_BIN env var (set by CI) or falls back to the project binary.
+/// Never uses `cargo run` — causes deadlock with `cargo test` on the package cache.
 fn tlink_cmd(args: &[&str]) -> Command {
-    // Always use `cargo run`. The binary at target/debug/tlink becomes a test
-    // harness after `cargo test --bin tlink`, so it can't be invoked directly.
-    let mut c = Command::new("cargo");
-    c.arg("run").arg("--").args(args);
-    c
+    // TLINK_BIN env var set by CI workflow to a pre-built binary copy
+    if let Ok(path) = std::env::var("TLINK_BIN") {
+        let mut c = Command::new(&path);
+        c.args(args);
+        return c;
+    }
+
+    // TLINK_DEBUG_BIN fallback for local development
+    for candidate in &["target/debug/tlink-cli", "target/debug/tlink"] {
+        let p = std::path::Path::new(candidate);
+        if p.is_file() {
+            // Quick sanity check: is this a test harness or the real binary?
+            let check = Command::new(p)
+                .arg("--version")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            if let Ok(status) = check {
+                if status.success() {
+                    let mut c = Command::new(p);
+                    c.args(args);
+                    return c;
+                }
+            }
+        }
+    }
+
+    panic!("tlink binary not found. Run `cargo build --bin tlink` first.");
 }
 
 fn check_bash_syntax(script: &str, label: &str) -> bool {
+    use std::path::PathBuf;
     let pid = std::process::id();
     let tid = std::thread::current().id();
     let tmp = std::env::temp_dir().join(format!("tlink-syntax-{}-{:?}-{}.sh", pid, tid, label));
@@ -281,8 +306,8 @@ fn test_tlink_open() {
 #[test]
 fn test_hook_pipe() {
     let payload = r#"{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Hook test"}"#;
-    let cmd =
-        format!("printf '%s' '{payload}' | cargo run -- notify --session s --window 1 --pane 0");
+    let tlink = std::env::var("TLINK_BIN").unwrap_or_else(|_| "target/debug/tlink".to_string());
+    let cmd = format!("printf '%s' '{payload}' | {tlink} notify --session s --window 1 --pane 0");
     let out = Command::new("bash").args(["-c", &cmd]).output().unwrap();
     assert!(
         out.status.success(),

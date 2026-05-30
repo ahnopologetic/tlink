@@ -34,14 +34,21 @@ jobs:
           tmux new-session -d -s ci-test 2>/dev/null || true
           tmux rename-window -t ci-test:0 test-window 2>/dev/null || true
 
-      # Pre-build the binary so `cargo run` inside integration tests doesn't
-      # need to compile (avoid re-entrant cargo lock contention)
-      - name: Build binary
-        run: cargo build --bin tlink
+      # Build the main binary and copy it to a safe location.
+      # Copying avoids test-harness transformation when cargo test re-links it.
+      - name: Build and copy binary
+        run: |
+          cargo build --bin tlink
+          cp target/debug/tlink /tmp/tlink-bin
+          chmod +x /tmp/tlink-bin
+          /tmp/tlink-bin --version
 
-      # Run all tests — unit (no subprocess) + integration (uses cargo run)
+      # Run all tests — integration tests use TLINK_BIN env var to find the
+      # pre-built binary copy, avoiding cargo lock conflicts.
       - name: Run tests
-        run: cargo test -- --test-threads=4
+        run: |
+          export TLINK_BIN=/tmp/tlink-bin
+          cargo test -- --test-threads=4
 
       - name: Clean up tmux
         if: always()

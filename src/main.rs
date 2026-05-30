@@ -29,7 +29,22 @@ fn run() -> Result<()> {
         Commands::Status => status::run(),
         Commands::Restart => restart::run(),
         Commands::Doctor => doctor::run(),
-        Commands::Install { addon } => addon::install(&addon),
+        Commands::Install {
+            interactive: true, ..
+        } => addon::install_interactive(),
+        Commands::Install {
+            addon: Some(name),
+            interactive: false,
+        } => addon::install(&name),
+        Commands::Install {
+            addon: None,
+            interactive: false,
+        } => {
+            eprintln!("Usage: tlink install <addon-name>");
+            eprintln!("       tlink install --interactive");
+            eprintln!("Run `tlink list add-ons` to see available add-ons.");
+            Ok(())
+        }
         Commands::Delete { addon } => addon::delete(&addon),
         Commands::List {
             target: ListTarget::Addons,

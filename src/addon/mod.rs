@@ -1,4 +1,5 @@
 pub mod claude_notification;
+mod interactive;
 
 use anyhow::{bail, Result};
 
@@ -43,4 +44,9 @@ pub fn list() -> Result<()> {
         println!("{:<25} {:<15} {}", a.name, status, a.description);
     }
     Ok(())
+}
+
+/// Interactive add-on selector using ratatui.
+pub fn install_interactive() -> Result<()> {
+    interactive::run()
 }

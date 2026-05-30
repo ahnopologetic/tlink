@@ -11,7 +11,7 @@
 open tmux://work/editor/0
 ```
 
-`tlink` registers the `tmux://` URI scheme and routes clicks to the exact pane — flashing the border and showing a status-bar toast on arrival. It also ships a [Claude Code notification addon](docs/claude-notification.md) that pings you when Claude finishes a task.
+`tlink` registers the `tmux://` URI scheme and routes clicks to the exact pane — flashing the border and showing a status-bar toast on arrival. It also ships notification addons that ping you when an AI coding agent finishes a task.
 
 ## Install
 
@@ -51,11 +51,20 @@ open tmux://mysession/editor/1
 | `tlink setup` | Register the `tmux://` URI scheme (macOS) |
 | `tlink open <uri>` | Navigate to a tmux pane |
 | `tlink install claude-notification` | Install the Claude Code notification addon |
+| `tlink install --interactive` | Interactive add-on selector (multi-select) |
 | `tlink status` | Show registration state and active sessions |
 | `tlink doctor` | Run diagnostic checks |
 | `tlink restart` | Re-register the URI handler |
 
 ## Addons
+
+### Interactive install
+
+Use `tlink install -i` or `tlink install --interactive` to open a TUI that lists all available add-ons with checkboxes. Select multiple add-ons and install them all at once.
+
+```bash
+tlink install -i
+```
 
 ### claude-notification
 

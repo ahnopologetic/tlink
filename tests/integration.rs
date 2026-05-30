@@ -5,24 +5,42 @@ use std::process::{Command, Stdio};
 /// Path to the pre-built tlink binary.
 /// Prefer the binary compiled by `cargo build` (avoids lock conflicts with `cargo test`).
 fn tlink_binary() -> PathBuf {
-    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
-        let c = PathBuf::from(manifest).join("target/debug/tlink");
+    eprintln!("[dbg] CWD={:?}", std::env::current_dir());
+    if let Ok(m) = std::env::var("CARGO_MANIFEST_DIR") {
+        let c = PathBuf::from(&m).join("target/debug/tlink");
+        eprintln!(
+            "[dbg] manifest={}, candidate={}, exists={}",
+            m,
+            c.display(),
+            c.exists()
+        );
         if c.exists() {
             return c;
         }
     }
     let c = PathBuf::from("target/debug/tlink");
+    eprintln!("[dbg] relative={}, exists={}", c.display(), c.exists());
     if c.exists() {
         return c;
     }
-    if let Some(p) = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().and_then(|p| p.parent()).map(|p| p.join("tlink")))
-    {
-        if p.exists() {
-            return p;
+    if let Some(exe) = std::env::current_exe().ok() {
+        if let Some(p) = exe
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("tlink"))
+        {
+            eprintln!(
+                "[dbg] exe={}, parent_tlink={}, exists={}",
+                exe.display(),
+                p.display(),
+                p.exists()
+            );
+            if p.exists() {
+                return p;
+            }
         }
     }
+    eprintln!("[dbg] falling back to 'cargo'");
     PathBuf::from("cargo")
 }
 

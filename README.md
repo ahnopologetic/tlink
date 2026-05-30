@@ -8,7 +8,7 @@
 ---
 
 ```
-open tmux://work/editor/0
+open tmux://<session>/<window>/<pane>
 ```
 
 `tlink` registers the `tmux://` URI scheme and routes clicks to the exact pane — flashing the border and showing a status-bar toast on arrival. It also ships notification addons that ping you when an AI coding agent finishes a task.
@@ -40,10 +40,70 @@ Runs a TUI wizard that picks your terminal emulator, compiles a minimal Swift ha
 
 ## Usage
 
+### Click a link (from anywhere)
+
+Once `tlink setup` is done, any `tmux://` link is clickable — in Slack, in a browser, in a chat app, wherever. macOS routes it through TmuxLink.app and into `tlink open`.
+
 ```bash
-open tmux://mysession
-open tmux://mysession/editor
-open tmux://mysession/editor/1
+# Click these from anywhere — they open in your terminal
+tmux://mysession
+tmux://mysession/work
+tmux://mysession/work/1
+```
+
+Links target three levels of specificity:
+
+| Target | Example | What happens |
+|--------|---------|-------------|
+| Session | `tmux://work` | Switches to the `work` session |
+| Session + window | `tmux://work/editor` | Switches to window `editor` in `work` |
+| Session + window + pane | `tmux://work/editor/0` | Switches to pane 0 in `editor` |
+
+If you're already in tmux, the current pane switches to the target and flashes green. A status-bar toast confirms the jump:
+
+```
+[tlink] tlink → work:editor.0
+```
+
+If no tmux client is attached (you clicked the link from outside a terminal), `tlink` falls back to asking your terminal to open a new window running `tmux attach-session -t <session>`. This works on Terminal.app, iTerm2, Kitty, and WezTerm.
+
+### Run from a terminal
+
+```bash
+# Direct open — same as clicking a link
+tlink open "tmux://mysession"
+
+# Or use macOS open command
+tlink open "tmux://mysession/work/1"
+```
+
+### Notification addons
+
+When an AI coding agent (Claude Code, Codex CLI, Gemini CLI, Pi) finishes a task, tlink can ping you with a desktop notification:
+
+```bash
+tlink install claude-notification
+tlink install pi-notification
+tlink install --interactive
+```
+
+The notification includes a clickable deeplink back to the session, window, and pane where the agent was running. See [Addons](#addons) below.
+
+### Telemetry
+
+```bash
+tlink telemetry status      # Check current setting
+tlink telemetry enable      # Opt in (anonymous usage data)
+tlink telemetry disable     # Opt out
+```
+
+Activity events are written locally to `~/.local/share/tlink/telemetry/events.jsonl`. If a Sentry DSN is configured (set `TLINK_SENTRY_DSN` at build time), errors and activity are sent to Sentry for diagnostics.
+
+### Diagnostics
+
+```bash
+tlink status     # Registration state + active tmux sessions
+tlink doctor     # Run all diagnostic checks
 ```
 
 ## Commands
@@ -57,6 +117,10 @@ open tmux://mysession/editor/1
 | `tlink install gemini-notification` | Install the Gemini CLI notification addon |
 | `tlink install pi-notification` | Install the Pi agent notification addon |
 | `tlink install --interactive` | Interactive add-on selector (multi-select) |
+| `tlink delete <addon>` | Remove a notification addon |
+| `tlink telemetry status` | Show telemetry setting |
+| `tlink telemetry enable` | Opt into anonymous usage data |
+| `tlink telemetry disable` | Opt out |
 | `tlink status` | Show registration state and active sessions |
 | `tlink doctor` | Run diagnostic checks |
 | `tlink restart` | Re-register the URI handler |

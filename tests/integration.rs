@@ -29,8 +29,22 @@ fn tlink_cmd(args: &[&str]) -> Command {
             resolved
         );
         if is_f {
-            let mut c = Command::new(&candidate);
-            c.args(args);
+            let binary = candidate.to_string_lossy().to_string();
+            // Use `sh -c` to execute — Command::new with PathBuf can fail
+            // with ENOENT on some CI environments despite the file existing.
+            let quoted = |s: &str| -> String {
+                if s.contains(' ') || s.contains('\'') || s.is_empty() {
+                    format!("'{}'", s.replace('\'', "'\\''"))
+                } else {
+                    s.to_string()
+                }
+            };
+            let cmd_str = std::iter::once(quoted(&binary))
+                .chain(args.iter().map(|a| quoted(a)))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let mut c = Command::new("sh");
+            c.arg("-c").arg(&cmd_str);
             return c;
         }
     }

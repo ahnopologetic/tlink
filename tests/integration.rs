@@ -318,7 +318,10 @@ fn test_tlink_open() {
 fn test_hook_pipe() {
     let payload = r#"{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"Hook test"}"#;
     let tlink = std::env::var("TLINK_BIN").unwrap_or_else(|_| "target/debug/tlink".to_string());
-    let cmd = format!("printf '%s' '{payload}' | {tlink} notify --session s --window 1 --pane 0");
+    let cmd = format!(
+        "printf '%s' '{payload}' | '{}' notify --session s --window 1 --pane 0",
+        tlink
+    );
     let out = Command::new("bash").args(["-c", &cmd]).output().unwrap();
     assert!(
         out.status.success(),

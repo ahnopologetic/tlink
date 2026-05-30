@@ -5,21 +5,37 @@ use std::process::{Command, Stdio};
 /// Find the tlink binary.  On CI we have target/debug/tlink from the build step;
 /// locally `cargo run` works too.
 fn tlink_binary() -> PathBuf {
-    // Prefer pre-built binary next to the test runner
-    let exe_dir = std::env::current_exe()
+    // 1. Same directory as the test runner (target/debug/deps/ → target/debug/)
+    if let Some(exe_parent) = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| PathBuf::from("target/debug"));
-    let candidate = exe_dir.join("tlink");
-    if candidate.exists() {
-        return candidate;
+    {
+        // Check target/debug/ (parent of deps/)
+        if let Some(debug_dir) = exe_parent.parent() {
+            let candidate = debug_dir.join("tlink");
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+        // Check same dir
+        let candidate = exe_parent.join("tlink");
+        if candidate.exists() {
+            return candidate;
+        }
     }
-    // Fallback: look in target/debug relative to manifest dir
-    let fallback = PathBuf::from("target/debug/tlink");
-    if fallback.exists() {
-        return fallback;
+    // 2. Relative to CARGO_MANIFEST_DIR
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let candidate = PathBuf::from(manifest).join("target/debug/tlink");
+        if candidate.exists() {
+            return candidate;
+        }
     }
-    // Last resort: use cargo run
+    // 3. Absolute fallback
+    let global = PathBuf::from("target/debug/tlink");
+    if global.exists() {
+        return global;
+    }
+    // 4. Last resort: use `cargo` as command name (caller will add "run")
     PathBuf::from("cargo")
 }
 

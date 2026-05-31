@@ -6,12 +6,14 @@ pub struct DunstifyAdapter;
 
 impl DunstifyAdapter {
     pub fn build_script(&self, req: &NotificationRequest) -> String {
+        let appname = format!("tlink ({})", req.session);
         format!(
             "ACTION=$(dunstify {t} {m} --action='default,Go there' \
-                --urgency=normal --icon=utilities-terminal --appname='Claude Code'); \
+                --urgency=normal --icon=utilities-terminal --appname={a}); \
              [ \"$ACTION\" = \"default\" ] && tlink open {dl}",
             t = sh_quote(&req.title),
             m = sh_quote(&req.message),
+            a = sh_quote(&appname),
             dl = sh_quote(&req.deeplink),
         )
     }
@@ -44,6 +46,7 @@ mod tests {
             message: "Done".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
+            session: "mysession".into(),
         }
     }
 
@@ -65,6 +68,13 @@ mod tests {
         let s = DunstifyAdapter.build_script(&req());
         assert!(s.contains("'Claude'"));
         assert!(s.contains("'Done'"));
+    }
+
+    #[test]
+    fn build_script_includes_session_in_appname() {
+        let s = DunstifyAdapter.build_script(&req());
+        assert!(s.contains("tlink (mysession)"));
+        assert!(s.contains("--appname="));
     }
 
     #[test]

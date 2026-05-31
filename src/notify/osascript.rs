@@ -7,10 +7,11 @@ pub struct OsascriptAdapter;
 impl OsascriptAdapter {
     pub fn build_script(&self, req: &NotificationRequest) -> String {
         format!(
-            "display notification \"{}\" with title \"{}\" subtitle \"{}\" sound name \"Glass\"\n\
+            "display notification \"{}\" with title \"{}\" subtitle \"{} @ {}\" sound name \"Glass\"\n\
              open location \"{}\"",
             applescript_escape(&req.message),
             applescript_escape(&req.title),
+            applescript_escape(&req.session),
             applescript_escape(&req.location),
             applescript_escape(&req.deeplink),
         )
@@ -41,6 +42,7 @@ mod tests {
             message: "Msg".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
+            session: "s".into(),
         }
     }
 
@@ -58,6 +60,13 @@ mod tests {
     }
 
     #[test]
+    fn build_script_subtitle_includes_session() {
+        let s = OsascriptAdapter.build_script(&req());
+        // subtitle is "s @ s > w > 0" (session @ location)
+        assert!(s.contains("s @ s > w > 0"));
+    }
+
+    #[test]
     fn build_script_contains_open_location_for_deeplink() {
         let s = OsascriptAdapter.build_script(&req());
         assert!(s.contains("open location"));
@@ -71,6 +80,7 @@ mod tests {
             message: r"foo\bar".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
+            session: "s".into(),
         };
         let s = OsascriptAdapter.build_script(&r);
         assert!(s.contains(r#"\"hi\""#));

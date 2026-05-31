@@ -11,6 +11,7 @@ impl NotifySendAdapter {
             "--urgency=normal".into(),
             "--icon=utilities-terminal".into(),
             "--app-name=Claude Code".into(),
+            format!("--hint=string:synchronous:{}", req.session),
         ]
     }
 }
@@ -39,6 +40,7 @@ mod tests {
             message: "Msg".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
+            session: "mysession".into(),
         }
     }
 
@@ -66,6 +68,12 @@ mod tests {
     fn build_args_has_app_name() {
         let args = NotifySendAdapter.build_args(&req());
         assert!(args.contains(&"--app-name=Claude Code".to_string()));
+    }
+
+    #[test]
+    fn build_args_has_session_hint() {
+        let args = NotifySendAdapter.build_args(&req());
+        assert!(args.contains(&"--hint=string:synchronous:mysession".to_string()));
     }
 
     #[test]

@@ -175,6 +175,7 @@ pub fn run(session: &str, window: &str, pane: &str, term: &str) -> Result<()> {
         message,
         location,
         deeplink,
+        session: session.to_string(),
     };
 
     make_adapter(method).notify(&req)

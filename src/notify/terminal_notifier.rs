@@ -6,18 +6,23 @@ pub struct TerminalNotifierAdapter;
 impl TerminalNotifierAdapter {
     /// Returns the argument list for terminal-notifier (without the binary name).
     pub fn build_args(&self, req: &NotificationRequest) -> Vec<String> {
-        vec![
+        let args = vec![
             "-title".into(),
             req.title.clone(),
             "-subtitle".into(),
             req.location.clone(),
             "-message".into(),
             req.message.clone(),
+            // -group enables Notification Center to stack multiple notifications
+            // from the same tmux session into a single collapsible group.
+            "-group".into(),
+            req.session.clone(),
             // -execute is broken on macOS 12+. -open invokes the registered URL scheme
             // handler on click, routing through tlink's tmux:// handler without PATH issues.
             "-open".into(),
             req.deeplink.clone(),
-        ]
+        ];
+        args
     }
 }
 
@@ -48,6 +53,7 @@ mod tests {
             message: "Msg".into(),
             location: "s > w > 0".into(),
             deeplink: "tmux://s/w/0".into(),
+            session: "s".into(),
         }
     }
 
@@ -77,6 +83,13 @@ mod tests {
         let args = TerminalNotifierAdapter.build_args(&req());
         assert!(args.contains(&"-open".to_string()));
         assert!(!args.contains(&"-execute".to_string()));
+    }
+
+    #[test]
+    fn build_args_contains_group_session() {
+        let args = TerminalNotifierAdapter.build_args(&req());
+        let idx = args.iter().position(|a| a == "-group").unwrap();
+        assert_eq!(args[idx + 1], "s");
     }
 
     #[test]

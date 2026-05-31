@@ -352,13 +352,14 @@ fn build_registrations(events: &[HookEvent]) -> Vec<(String, String)> {
 
 /// Thin bash wrapper — captures tmux context, delegates JSON parsing and
 /// notification firing entirely to `tlink notify` (Rust).
+/// The `--source claude` flag tells tlink which agent adapter to use.
 pub fn hook_script() -> &'static str {
     r##"#!/bin/bash
 SESSION=$(tmux display-message -p "#{session_name}" 2>/dev/null) || exit 0
 WINDOW=$(tmux display-message -p "#{window_name}" 2>/dev/null) || exit 0
 PANE=$(tmux display-message -p "#{pane_index}" 2>/dev/null) || exit 0
 [ -z "$SESSION" ] && exit 0
-exec tlink notify --session "$SESSION" --window "$WINDOW" --pane "$PANE"
+exec tlink notify --source claude --session "$SESSION" --window "$WINDOW" --pane "$PANE"
 "##
 }
 

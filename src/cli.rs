@@ -46,7 +46,7 @@ pub enum Commands {
         #[command(subcommand)]
         action: TelemetryAction,
     },
-    /// Fire a desktop notification from a Claude Code hook (reads JSON from stdin)
+    /// Fire a desktop notification from a coding agent hook (reads JSON from stdin)
     #[command(hide = true)]
     Notify {
         #[arg(long)]
@@ -58,6 +58,9 @@ pub enum Commands {
         /// Terminal emulator detected from tmux client_termtype (e.g. "ghostty 1.2.3")
         #[arg(long, default_value = "")]
         term: String,
+        /// Agent source: pi, claude, gemini, or codex (defaults to claude)
+        #[arg(long, default_value = "")]
+        source: String,
     },
 }
 

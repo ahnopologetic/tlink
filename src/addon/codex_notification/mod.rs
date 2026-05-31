@@ -154,13 +154,28 @@ pub fn uninstall() -> Result<()> {
 
 // ── Installation logic ────────────────────────────────────────────────────────
 
+/// Thin bash wrapper — captures tmux context and the "turn-ended" argument,
+/// pipes a JSON payload to `tlink notify` (Rust), which fires the desktop
+/// notification via the configured backend.
+/// The `--source codex` flag tells tlink which agent adapter to use.
+pub fn hook_script() -> &'static str {
+    r##"#!/bin/bash
+SESSION=$(tmux display-message -p "#{session_name}" 2>/dev/null) || exit 0
+WINDOW=$(tmux display-message -p "#{window_name}" 2>/dev/null) || exit 0
+PANE=$(tmux display-message -p "#{pane_index}" 2>/dev/null) || exit 0
+[ -z "$SESSION" ] && exit 0
+STATUS="${1:-turn-ended}"
+printf '{"source":"codex","status":"%s"}\n' "$STATUS" | tlink notify --source codex --session "$SESSION" --window "$WINDOW" --pane "$PANE"
+"##
+}
+
 pub fn install_with_options(opts: &InstallOptions) -> Result<()> {
     let script = hook_script_path();
     if let Some(p) = script.parent() {
         std::fs::create_dir_all(p)?;
     }
 
-    std::fs::write(&script, generate_hook_script(&opts.method))?;
+    std::fs::write(&script, hook_script())?;
     std::process::Command::new("chmod")
         .args(["+x", script.to_str().unwrap()])
         .status()?;
@@ -176,9 +191,8 @@ pub fn install_with_options(opts: &InstallOptions) -> Result<()> {
     Ok(())
 }
 
-/// Generate a bash hook script for Codex CLI
-/// Codex CLI calls the notify command with "turn-ended" arg when a turn ends.
-/// Our script captures tmux context and pipes a JSON payload to `tlink notify`.
+/// Generate a bash hook script for Codex CLI (legacy — see hook_script())
+#[allow(dead_code)]
 fn generate_hook_script(method: &NotifMethod) -> String {
     // DEEPLINK is only passed to the click action, never shown as visible text
     let notify_block = match method {
@@ -302,51 +316,35 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_script_captures_tmux_context() {
-        for method in [
-            NotifMethod::TerminalNotifier,
-            NotifMethod::Osascript,
-            NotifMethod::Dunstify,
-            NotifMethod::NotifySend,
-        ] {
-            let s = generate_hook_script(&method);
-            assert!(
-                s.contains("session_name"),
-                "missing session_name for {:?}",
-                method
-            );
-            assert!(
-                s.contains("window_name"),
-                "missing window_name for {:?}",
-                method
-            );
-            assert!(
-                s.contains("pane_index"),
-                "missing pane_index for {:?}",
-                method
-            );
-        }
+    fn test_hook_script_captures_tmux_context() {
+        let s = hook_script();
+        assert!(s.contains("session_name"), "missing session_name");
+        assert!(s.contains("window_name"), "missing window_name");
+        assert!(s.contains("pane_index"), "missing pane_index");
     }
 
     #[test]
-    fn test_generate_script_does_not_expose_deeplink_in_text() {
-        let s = generate_hook_script(&NotifMethod::TerminalNotifier);
-        assert!(s.contains("-subtitle \"$LOCATION\""));
-        assert!(!s.contains("-message \"$DEEPLINK\""));
-        assert!(!s.contains("-title \"$DEEPLINK\""));
+    fn test_hook_script_has_source_codex() {
+        let s = hook_script();
+        assert!(s.contains("--source codex"), "missing --source codex flag");
     }
 
     #[test]
-    fn test_generate_script_terminal_notifier_has_click_action() {
-        let s = generate_hook_script(&NotifMethod::TerminalNotifier);
-        assert!(s.contains("-execute"));
-        assert!(s.contains("tlink open"));
+    fn test_hook_script_calls_tlink_notify() {
+        let s = hook_script();
+        assert!(s.contains("tlink notify"), "missing tlink notify call");
     }
 
     #[test]
-    fn test_generate_script_dunstify_has_click_action() {
-        let s = generate_hook_script(&NotifMethod::Dunstify);
-        assert!(s.contains("tlink open \"$DEEPLINK\""));
-        assert!(s.contains("ACTION"));
+    fn test_hook_script_sends_json_status() {
+        let s = hook_script();
+        assert!(s.contains("\"source\":\"codex\""), "missing source in JSON");
+        assert!(s.contains("\"status\""), "missing status in JSON");
+    }
+
+    #[test]
+    fn test_hook_script_uses_turn_ended_default() {
+        let s = hook_script();
+        assert!(s.contains("turn-ended"), "missing turn-ended default");
     }
 }

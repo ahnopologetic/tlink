@@ -82,7 +82,8 @@ fn run() -> Result<()> {
             window,
             pane,
             term,
-        } => notify::run(session, window, pane, term),
+            source,
+        } => notify::run(session, window, pane, term, source),
     };
     if result.is_ok() {
         telemetry::record_event(

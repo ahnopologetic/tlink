@@ -128,9 +128,7 @@ fn generate_extension(events: &[PiEvent]) -> String {
         handlers.push_str(
             r#"
 pi.on("agent_end", async (event, ctx) => {
-  const title = "Pi";
-  const body = "Ready for input";
-  spawn_notify(title, body, ctx);
+  spawn_notify("agent_end", event.message ?? "Ready for input", {});
 });"#,
         );
     }
@@ -139,10 +137,8 @@ pi.on("agent_end", async (event, ctx) => {
         handlers.push_str(
             r#"
 pi.on("session_start", async (event, ctx) => {
-  const title = "Pi";
   const reason = event.reason ?? "startup";
-  const body = `Session started (${reason})`;
-  spawn_notify(title, body, ctx);
+  spawn_notify("session_start", `Session started (${reason})`, {});
 });"#,
         );
     }
@@ -151,10 +147,8 @@ pi.on("session_start", async (event, ctx) => {
         handlers.push_str(
             r#"
 pi.on("session_shutdown", async (event, ctx) => {
-  const title = "Pi";
   const reason = event.reason ?? "unknown";
-  const body = `Session ended (${reason})`;
-  spawn_notify(title, body, ctx);
+  spawn_notify("session_shutdown", `Session ended (${reason})`, {});
 });"#,
         );
     }
@@ -163,10 +157,9 @@ pi.on("session_shutdown", async (event, ctx) => {
         handlers.push_str(
             r#"
 pi.on("turn_end", async (event, ctx) => {
-  const title = "Pi";
-  const turnIndex = event.turnIndex ?? 0;
-  const body = `Turn ${turnIndex} completed`;
-  spawn_notify(title, body, ctx);
+  spawn_notify("turn_end", `Turn ${event.turnIndex ?? 0} completed`, {
+    turn_index: event.turnIndex ?? 0,
+  });
 });"#,
         );
     }
@@ -175,10 +168,10 @@ pi.on("turn_end", async (event, ctx) => {
         handlers.push_str(
             r#"
 pi.on("tool_execution_end", async (event, ctx) => {
-  const title = "Pi";
   const toolName = event.toolName ?? "Tool";
-  const body = `${toolName} completed`;
-  spawn_notify(title, body, ctx);
+  spawn_notify("tool_execution_end", `${toolName} completed`, {
+    tool: toolName,
+  });
 });"#,
         );
     }
@@ -188,9 +181,7 @@ pi.on("tool_execution_end", async (event, ctx) => {
         handlers.push_str(
             r#"
 pi.on("agent_end", async (event, ctx) => {
-  const title = "Pi";
-  const body = "Ready for input";
-  spawn_notify(title, body, ctx);
+  spawn_notify("agent_end", event.message ?? "Ready for input", {});
 });"#,
         );
     }
@@ -215,7 +206,7 @@ pi.on("agent_end", async (event, ctx) => {
     out.push_str(" * desktop notification.  Uses child_process.spawn with stdin pipe\n");
     out.push_str(" * (no shell escaping issues) to send the JSON payload.\n");
     out.push_str(" */\n");
-    out.push_str("function spawn_notify(title: string, body: string, _ctx: any): void {\n");
+    out.push_str("function spawn_notify(event: string, message: string, extra: Record<string, any>): void {\n");
     out.push_str("  const execSync = require(\"child_process\").execSync;\n");
     out.push_str("  const { spawn } = require(\"child_process\");\n");
     out.push_str("  let session = \"\", window = \"\", pane = \"\", term = \"\";\n");
@@ -232,13 +223,14 @@ pi.on("agent_end", async (event, ctx) => {
     out.push_str("  const termName = term.split(/\\s+/)[0] || \"\";\n");
     out.push('\n');
     out.push_str("  const payload = JSON.stringify({\n");
-    out.push_str("    hook_event_name: \"Notification\",\n");
-    out.push_str("    notification_type: \"idle_prompt\",\n");
-    out.push_str("    message: body,\n");
+    out.push_str("    source: \"pi\",\n");
+    out.push_str("    event: event,\n");
+    out.push_str("    message: message,\n");
+    out.push_str("    ...extra,\n");
     out.push_str("  });\n\n");
     out.push_str("  // Use spawn with stdin pipe — avoids shell escaping issues\n");
     out.push_str("  // with single quotes, backticks, etc. in the body text.\n");
-    out.push_str("  const child = spawn(\"tlink\", [\"notify\", \"--session\", session, \"--window\", window, \"--pane\", pane, \"--term\", termName], {\n");
+    out.push_str("  const child = spawn(\"tlink\", [\"notify\", \"--session\", session, \"--window\", window, \"--pane\", pane, \"--term\", termName, \"--source\", \"pi\"], {\n");
     out.push_str("    stdio: [\"pipe\", \"pipe\", \"pipe\"],\n");
     out.push_str("  });\n");
     out.push_str("  child.stdin.write(payload);\n");

@@ -42,26 +42,18 @@ fn check_bash_syntax(script: &str, label: &str) -> bool {
     ok
 }
 
-fn codex_script(m: &str) -> String {
-    let n = match m {
-        "terminal-notifier" => "    terminal-notifier \\\n        -title \"$NOTIF_TITLE\" \\\n        -subtitle \"$LOCATION\" \\\n        -message \"$MESSAGE\" \\\n        -execute \"tlink open $DEEPLINK\" &",
-        "osascript" => "    osascript -e \"display notification \\\"$MESSAGE\\\" with title \\\"$NOTIF_TITLE\\\" subtitle \\\"$LOCATION\\\" sound name \\\"Glass\\\"\"",
-        "dunstify" => "    (\n        ACTION=$(dunstify \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n            --hint=string:x-dunst-stack-tag:tlink \\\n            --action=\"default,Go there\" \\\n            --urgency=normal \\\n            --icon=utilities-terminal \\\n            --appname=\"Codex CLI\")\n        [ \"$ACTION\" = \"default\" ] && tlink open \"$DEEPLINK\"\n    ) &",
-        "notify-send" => "    notify-send \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n        --urgency=normal \\\n        --icon=utilities-terminal \\\n        --app-name=\"Codex CLI\" \\\n        --hint=string:body:\"$LOCATION\"",
-        _ => panic!("unknown: {m}"),
-    };
-    format!("#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nMESSAGE=\"Codex CLI task completed\"\nNOTIF_TITLE=\"Codex CLI\"\nDEEPLINK=\"tmux://${{SESSION}}/${{WINDOW}}/${{PANE}}\"\nLOCATION=\"${{SESSION}} > ${{WINDOW}} > ${{PANE}}\"\n{n}\n")
+fn codex_script(_m: &str) -> String {
+    // Thin wrapper — delegates to tlink notify with --source codex
+    format!(
+        "#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nSTATUS=\"${{1:-turn-ended}}\"\nprintf '{{\"source\":\"codex\",\"status\":\"%s\"}}\\n' \"$STATUS\" | tlink notify --source codex --session \"$SESSION\" --window \"$WINDOW\" --pane \"$PANE\"\n"
+    )
 }
 
-fn gemini_script(m: &str) -> String {
-    let n = match m {
-        "terminal-notifier" => "    terminal-notifier \\\n        -title \"$NOTIF_TITLE\" \\\n        -subtitle \"$LOCATION\" \\\n        -message \"$MESSAGE\" \\\n        -execute \"tlink open $DEEPLINK\" &",
-        "osascript" => "    osascript -e \"display notification \\\"$MESSAGE\\\" with title \\\"$NOTIF_TITLE\\\" subtitle \\\"$LOCATION\\\" sound name \\\"Glass\\\"\"",
-        "dunstify" => "    (\n        ACTION=$(dunstify \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n            --hint=string:x-dunst-stack-tag:tlink \\\n            --action=\"default,Go there\" \\\n            --urgency=normal \\\n            --icon=utilities-terminal \\\n            --appname=\"Gemini CLI\")\n        [ \"$ACTION\" = \"default\" ] && tlink open \"$DEEPLINK\"\n    ) &",
-        "notify-send" => "    notify-send \"$NOTIF_TITLE\" \"$MESSAGE\" \\\n        --urgency=normal \\\n        --icon=utilities-terminal \\\n        --app-name=\"Gemini CLI\" \\\n        --hint=string:body:\"$LOCATION\"",
-        _ => panic!("unknown: {m}"),
-    };
-    format!("#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nINPUT=$(cat)\nMESSAGE=$(echo \"$INPUT\" | python3 -c 'import sys,json; d=json.loads(sys.stdin.read()); print(d.get(\"message\",\"Gemini CLI notification\"))' 2>/dev/null || echo \"Gemini CLI notification\")\nNOTIF_TITLE=\"Gemini CLI\"\nDEEPLINK=\"tmux://$SESSION/$WINDOW/$PANE\"\nLOCATION=\"$SESSION > $WINDOW > $PANE\"\n{n}\n")
+fn gemini_script(_m: &str) -> String {
+    // Thin wrapper — delegates to tlink notify with --source gemini
+    format!(
+        "#!/bin/bash\nSESSION=$(tmux display-message -p \"#{{session_name}}\" 2>/dev/null) || exit 0\nWINDOW=$(tmux display-message -p \"#{{window_name}}\" 2>/dev/null) || exit 0\nPANE=$(tmux display-message -p \"#{{pane_index}}\" 2>/dev/null) || exit 0\n[ -z \"$SESSION\" ] && exit 0\nexec tlink notify --source gemini --session \"$SESSION\" --window \"$WINDOW\" --pane \"$PANE\"\n"
+    )
 }
 
 #[test]

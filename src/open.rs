@@ -62,7 +62,7 @@ pub fn parse_uri(uri: &str) -> Result<TmuxTarget> {
         parts
             .get(i)
             .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
+            .map(|s| percent_decode(s))
     };
 
     Ok(TmuxTarget {
@@ -307,6 +307,56 @@ mod tests {
         let t = parse_uri("tmux://mysession?term=Apple_Terminal").unwrap();
         assert_eq!(t.session.as_deref(), Some("mysession"));
         assert_eq!(t.term.as_deref(), Some("Apple_Terminal"));
+    }
+
+    #[test]
+    fn test_parse_session_with_encoded_slash() {
+        let t = parse_uri("tmux://work%2Fbackend").unwrap();
+        assert_eq!(t.session.as_deref(), Some("work/backend"));
+        assert!(t.window.is_none());
+        assert!(t.pane.is_none());
+    }
+
+    #[test]
+    fn test_parse_session_with_encoded_slash_trailing() {
+        // From the bug report: `tlink open "tmux://work%2Fbackend/"`
+        let t = parse_uri("tmux://work%2Fbackend/").unwrap();
+        assert_eq!(t.session.as_deref(), Some("work/backend"));
+        assert!(t.window.is_none());
+        assert!(t.pane.is_none());
+    }
+
+    #[test]
+    fn test_parse_window_with_encoded_slash() {
+        let t = parse_uri("tmux://s/win%2Fname/0").unwrap();
+        assert_eq!(t.session.as_deref(), Some("s"));
+        assert_eq!(t.window.as_deref(), Some("win/name"));
+        assert_eq!(t.pane.as_deref(), Some("0"));
+    }
+
+    #[test]
+    fn test_parse_session_with_space() {
+        let t = parse_uri("tmux://my%20session/0/0").unwrap();
+        assert_eq!(t.session.as_deref(), Some("my session"));
+        assert_eq!(t.window.as_deref(), Some("0"));
+        assert_eq!(t.pane.as_deref(), Some("0"));
+    }
+
+    #[test]
+    fn test_parse_backward_compat_unencoded() {
+        let t = parse_uri("tmux://plain/0/0").unwrap();
+        assert_eq!(t.session.as_deref(), Some("plain"));
+        assert_eq!(t.window.as_deref(), Some("0"));
+        assert_eq!(t.pane.as_deref(), Some("0"));
+    }
+
+    #[test]
+    fn test_parse_session_with_slash_and_term() {
+        let t = parse_uri("tmux://work%2Fbackend/0/0?term=ghostty").unwrap();
+        assert_eq!(t.session.as_deref(), Some("work/backend"));
+        assert_eq!(t.window.as_deref(), Some("0"));
+        assert_eq!(t.pane.as_deref(), Some("0"));
+        assert_eq!(t.term.as_deref(), Some("ghostty"));
     }
 
     #[test]

@@ -16,6 +16,40 @@ use std::io::Read;
 mod hooks;
 use hooks::HookPayload;
 
+/// RFC 3986 unreserved-only percent-encoding.
+fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            _ => {
+                out.push_str(&format!("%{:02X}", b));
+            }
+        }
+    }
+    out
+}
+
+fn build_deeplink(session: &str, window: &str, pane: &str, term: &str) -> String {
+    let s = percent_encode(session);
+    let w = percent_encode(window);
+    let p = percent_encode(pane);
+    if term.is_empty() {
+        format!("tmux://{}/{}/{}", s, w, p)
+    } else {
+        let term_name = term.split_whitespace().next().unwrap_or(term);
+        format!(
+            "tmux://{}/{}/{}?term={}",
+            s,
+            w,
+            p,
+            percent_encode(term_name)
+        )
+    }
+}
+
 /// Run a notification: read hook JSON from stdin, resolve via the correct
 /// agent adapter, and fire a desktop notification.
 pub fn run(session: &str, window: &str, pane: &str, term: &str, source: &str) -> Result<()> {
@@ -30,28 +64,7 @@ pub fn run(session: &str, window: &str, pane: &str, term: &str, source: &str) ->
     }
     let (title, message, _choices) = hooks::resolve(&payload);
 
-    fn percent_encode(s: &str) -> String {
-        let mut out = String::with_capacity(s.len());
-        for &b in s.as_bytes() {
-            match b {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                    out.push(b as char);
-                }
-                _ => {
-                    out.push_str(&format!("%{:02X}", b));
-                }
-            }
-        }
-        out
-    }
-
-    let deeplink = if term.is_empty() {
-        format!("tmux://{}/{}/{}", session, window, pane)
-    } else {
-        let term_name = term.split_whitespace().next().unwrap_or(term);
-        let encoded = percent_encode(term_name);
-        format!("tmux://{}/{}/{}?term={}", session, window, pane, encoded)
-    };
+    let deeplink = build_deeplink(session, window, pane, term);
     let location = format!("{} > {} > {}", session, window, pane);
 
     let icon_path = icon::ensure_icon()
@@ -119,5 +132,37 @@ mod tests {
     #[test]
     fn factory_unknown_method_falls_back_to_osascript() {
         assert_eq!(make_adapter("xdg-desktop-portal").name(), "osascript");
+    }
+
+    // ── build_deeplink ────────────────────────────────────────────────────────
+
+    #[test]
+    fn deeplink_plain_session() {
+        let uri = build_deeplink("mysession", "0", "1", "");
+        assert_eq!(uri, "tmux://mysession/0/1");
+    }
+
+    #[test]
+    fn deeplink_encodes_slash_in_session() {
+        let uri = build_deeplink("work/backend", "0", "1", "");
+        assert_eq!(uri, "tmux://work%2Fbackend/0/1");
+    }
+
+    #[test]
+    fn deeplink_encodes_slash_in_window() {
+        let uri = build_deeplink("s", "win/name", "0", "");
+        assert_eq!(uri, "tmux://s/win%2Fname/0");
+    }
+
+    #[test]
+    fn deeplink_encodes_space_in_session() {
+        let uri = build_deeplink("my session", "0", "0", "");
+        assert_eq!(uri, "tmux://my%20session/0/0");
+    }
+
+    #[test]
+    fn deeplink_with_term_encodes_segments_and_term() {
+        let uri = build_deeplink("work/backend", "0", "0", "ghostty 1.2.3");
+        assert_eq!(uri, "tmux://work%2Fbackend/0/0?term=ghostty");
     }
 }

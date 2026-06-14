@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
-/// Embed the notification logo at compile time.
-const LOGO_BYTES: &[u8] = include_bytes!("../../assets/notification-logo.png");
+/// Canonical raw GitHub URL for the tlink notification logo.
+/// Downloaded on first access and cached at `~/.tlink/notification-logo.png`.
+pub const ICON_URL: &str =
+    "https://raw.githubusercontent.com/ahnopologetic/tlink/main/assets/notification-logo.png";
 
-/// Returns the path to the notification logo, extracting it to disk
-/// on first access. The icon lives at `~/.tlink/notification-logo.png`.
+/// Returns the path to the notification logo, downloading it from the
+/// raw GitHub URL on first access. The icon is cached at `~/.tlink/notification-logo.png`.
 pub fn ensure_icon() -> std::io::Result<PathBuf> {
     let tlink_dir = dirs::home_dir()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "home dir not found"))?
@@ -15,9 +17,19 @@ pub fn ensure_icon() -> std::io::Result<PathBuf> {
 
     let icon_path = tlink_dir.join("notification-logo.png");
 
-    // Write the icon only if it doesn't already exist (idempotent).
+    // Download the icon only if it doesn't already exist (idempotent).
     if !icon_path.exists() {
-        std::fs::write(&icon_path, LOGO_BYTES)?;
+        let status = std::process::Command::new("curl")
+            .args(["-fsSL", "-o"])
+            .arg(&icon_path)
+            .arg(ICON_URL)
+            .status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(format!(
+                "curl failed with exit code {}",
+                status
+            )));
+        }
     }
 
     Ok(icon_path)
@@ -28,19 +40,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn logo_bytes_is_not_empty() {
-        assert!(!LOGO_BYTES.is_empty());
+    fn icon_url_is_https() {
+        assert!(ICON_URL.starts_with("https://"));
     }
 
     #[test]
-    fn logo_bytes_looks_like_png() {
-        assert_eq!(&LOGO_BYTES[..4], b"\x89PNG");
-    }
-
-    #[test]
-    fn ensure_icon_creates_file_in_tlink_dir() {
-        let path = ensure_icon().expect("should create icon");
-        assert!(path.exists());
-        assert!(path.ends_with(".tlink/notification-logo.png"));
+    fn icon_url_points_to_tlink_repo_asset() {
+        assert!(ICON_URL.contains("ahnopologetic/tlink"));
+        assert!(ICON_URL.ends_with("notification-logo.png"));
     }
 }

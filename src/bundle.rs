@@ -17,6 +17,8 @@ pub fn info_plist() -> String {
 <dict>
     <key>CFBundleExecutable</key>
     <string>TmuxLink</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.tlink.handler</string>
     <key>CFBundleName</key>
@@ -109,7 +111,9 @@ pub fn create() -> Result<()> {
     let app = bundle_path();
     let contents = app.join("Contents");
     let macos = contents.join("MacOS");
+    let resources = contents.join("Resources");
     std::fs::create_dir_all(&macos)?;
+    std::fs::create_dir_all(&resources)?;
 
     let tlink_bin = find_tlink_binary()?;
     let swift_src = swift_handler_source(&tlink_bin);
@@ -128,12 +132,19 @@ pub fn create() -> Result<()> {
         bail!("swiftc failed — is Xcode Command Line Tools installed? Run: xcode-select --install");
     }
 
+    // Install the app icon into the bundle so -sender com.tlink.handler
+    // pulls it for notification banners.
+    let icon = crate::notify::icon::ensure_icon()?;
+    std::fs::copy(&icon, resources.join("AppIcon.png"))?;
+
     std::fs::write(contents.join("Info.plist"), info_plist())?;
     std::fs::remove_file(&swift_file).ok();
 
-    Command::new(LSREGISTER)
-        .args(["-f", app.to_str().unwrap()])
-        .status()?;
+    // Touch the app bundle so LaunchServices picks up the icon change.
+    let app_str = app.to_str().unwrap();
+    Command::new("touch").arg(app_str).status().ok();
+
+    Command::new(LSREGISTER).args(["-f", app_str]).status()?;
 
     Ok(())
 }
@@ -157,6 +168,8 @@ mod tests {
         assert!(plist.contains("CFBundleURLSchemes"));
         assert!(plist.contains("com.tlink.handler"));
         assert!(plist.contains("<string>TmuxLink</string>"));
+        assert!(plist.contains("CFBundleIconFile"));
+        assert!(plist.contains("<string>AppIcon</string>"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 mod adapter;
 mod dunstify;
-mod icon;
+pub mod icon;
 mod notify_send;
 mod osascript;
 mod terminal_notifier;
@@ -77,7 +77,15 @@ pub fn run(session: &str, window: &str, pane: &str, term: &str, source: &str) ->
         .to_string();
 
     let config = crate::config::load().unwrap_or_default();
-    let method = config.notification_method.as_deref().unwrap_or("osascript");
+    let default_method = if cfg!(target_os = "macos") {
+        "terminal-notifier"
+    } else {
+        "dunstify"
+    };
+    let method = config
+        .notification_method
+        .as_deref()
+        .unwrap_or(default_method);
 
     let req = NotificationRequest {
         title,

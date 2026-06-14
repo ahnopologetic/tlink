@@ -6,7 +6,7 @@ pub struct TerminalNotifierAdapter;
 impl TerminalNotifierAdapter {
     /// Returns the argument list for terminal-notifier (without the binary name).
     pub fn build_args(&self, req: &NotificationRequest) -> Vec<String> {
-        let mut args = vec![
+        let args = vec![
             "-title".into(),
             req.title.clone(),
             "-subtitle".into(),
@@ -21,11 +21,12 @@ impl TerminalNotifierAdapter {
             // handler on click, routing through tlink's tmux:// handler without PATH issues.
             "-open".into(),
             req.deeplink.clone(),
+            // -sender uses the TmuxLink.app bundle identifier so macOS pulls
+            // the app icon from the bundle (Contents/Resources/AppIcon.png).
+            // -appIcon with a raw file path is unreliable across macOS versions.
+            "-sender".into(),
+            "com.tlink.handler".into(),
         ];
-        if !req.icon_path.is_empty() {
-            args.push("-appIcon".into());
-            args.push(req.icon_path.clone());
-        }
         args
     }
 }
@@ -98,19 +99,13 @@ mod tests {
     }
 
     #[test]
-    fn build_args_includes_app_icon_when_path_set() {
+    fn build_args_uses_sender_not_app_icon() {
+        // -sender com.tlink.handler is the reliable way to set the
+        // notification icon — macOS pulls it from the app bundle.
+        // -appIcon with a file path is unreliable across macOS versions.
         let args = TerminalNotifierAdapter.build_args(&req());
-        let idx = args.iter().position(|a| a == "-appIcon").unwrap();
-        assert_eq!(args[idx + 1], "/tmp/tlink-logo.png");
-    }
-
-    #[test]
-    fn build_args_skips_app_icon_when_path_empty() {
-        let r = NotificationRequest {
-            icon_path: String::new(),
-            ..req()
-        };
-        let args = TerminalNotifierAdapter.build_args(&r);
+        let idx = args.iter().position(|a| a == "-sender").unwrap();
+        assert_eq!(args[idx + 1], "com.tlink.handler");
         assert!(!args.contains(&"-appIcon".to_string()));
     }
 

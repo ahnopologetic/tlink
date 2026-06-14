@@ -6,24 +6,16 @@ pub struct OsascriptAdapter;
 
 impl OsascriptAdapter {
     pub fn build_script(&self, req: &NotificationRequest) -> String {
-        // `with icon` requires macOS 11+ (Big Sur) and a path to an image file.
-        // When the icon path is empty (fallback), we omit the clause.
-        let icon_clause = if req.icon_path.is_empty() {
-            String::new()
-        } else {
-            format!(
-                " with icon POSIX file \"{}\"",
-                applescript_escape(&req.icon_path),
-            )
-        };
+        // `with icon` is not valid on `display notification` — it is only
+        // accepted by `display alert` / `display dialog`. macOS Notification
+        // Center shows the icon of the calling process (osascript).
         format!(
-            "display notification \"{}\" with title \"{}\" subtitle \"{} @ {}\"{} sound name \"Glass\"\n\
+            "display notification \"{}\" with title \"{}\" subtitle \"{} @ {}\" sound name \"Glass\"\n\
              open location \"{}\"",
             applescript_escape(&req.message),
             applescript_escape(&req.title),
             applescript_escape(&req.session),
             applescript_escape(&req.location),
-            icon_clause,
             applescript_escape(&req.deeplink),
         )
     }
@@ -86,20 +78,11 @@ mod tests {
     }
 
     #[test]
-    fn build_script_includes_icon_when_path_set() {
+    fn build_script_never_uses_with_icon() {
+        // `display notification` does not accept `with icon` — only
+        // `display alert` / `display dialog` do. The script must never
+        // emit the clause regardless of whether an icon path is set.
         let s = OsascriptAdapter.build_script(&req());
-        assert!(s.contains("with icon"));
-        assert!(s.contains("POSIX file"));
-        assert!(s.contains("/tmp/tlink-logo.png"));
-    }
-
-    #[test]
-    fn build_script_omits_icon_when_path_empty() {
-        let r = NotificationRequest {
-            icon_path: String::new(),
-            ..req()
-        };
-        let s = OsascriptAdapter.build_script(&r);
         assert!(!s.contains("with icon"));
     }
 
